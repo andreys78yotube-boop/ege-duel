@@ -329,6 +329,10 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
 .g-ok { width: 36px; height: 36px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; flex: none; }
 @media (max-width: 760px) { .login-btn { margin-left: auto; } .login-btn:not(.hide) + .me-btn { margin-left: 0; } }
 
+/* шапка на всю ширину: логотип слева, меню и профиль справа */
+header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
+@media (max-width: 760px) { header.top .wrap { padding-left: 16px; padding-right: 16px; } }
+
 </style>
 </head>
 <body>
