@@ -413,6 +413,40 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 @media (max-width: 1180px) { .profile-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } .profile-side { position: static; grid-column: 2; grid-row: 1; } .profile-grid > .stack:not(.profile-side) { grid-column: 2; } .profile-grid > section.card { grid-row: 1 / span 2; } }
 @media (max-width: 760px) { .profile-grid { grid-template-columns: 1fr; } .profile-grid > *, .profile-side, .profile-grid > section.card { grid-column: auto !important; grid-row: auto !important; } }
 
+/* профиль без календаря: две колонки */
+.wrap:has(> #profile-page), #main:has(#profile-page) { max-width: 1180px; }
+.profile-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) !important; }
+.profile-grid > section.card, .profile-grid > .stack { grid-column: auto !important; grid-row: auto !important; }
+@media (max-width: 760px) { .profile-grid { grid-template-columns: 1fr !important; } }
+
+/* окно огонька */
+.modal-box.streak-modal { max-width: 640px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.modal-x { margin-left: auto; align-self: flex-start; border: 0; background: var(--bg2); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 22px; line-height: 1; color: var(--ink2); flex: none; }
+.modal-x:hover { color: var(--ink); }
+.streak-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.streak-stats .stat { min-width: 0; padding: 10px 8px; text-align: center; }
+.streak-stats .stat b { font-size: 20px; }
+.streak-stats .stat span { font-size: 11.5px; line-height: 1.25; display: block; }
+.hm-scroll { overflow-x: auto; padding-bottom: 4px; }
+.hm { display: inline-flex; flex-direction: column; gap: 4px; min-width: max-content; }
+.hm-months, .hm-body { display: flex; gap: 4px; }
+.hm-m { width: 16px; font-size: 11px; color: var(--ink3); font-weight: 600; white-space: nowrap; overflow: visible; }
+.hm-wd-pad { width: 22px; flex: none; }
+.hm-wd { display: flex; flex-direction: column; gap: 4px; width: 22px; flex: none; }
+.hm-wd span { height: 16px; font-size: 11px; line-height: 16px; color: var(--ink3); font-weight: 600; }
+.hm-col { display: flex; flex-direction: column; gap: 4px; }
+.hm-c { width: 16px; height: 16px; border-radius: 4px; display: inline-block; flex: none; background: var(--bg2); }
+.hm-c.l1 { background: rgba(255, 122, 0, .3); }
+.hm-c.l2 { background: rgba(255, 122, 0, .55); }
+.hm-c.l3 { background: rgba(255, 122, 0, .8); }
+.hm-c.l4 { background: #ff7a00; box-shadow: 0 0 8px rgba(255, 122, 0, .45); }
+.hm-c.skip { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink3); }
+.hm-c.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hm-c.future { background: transparent; }
+.hm-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 12px; color: var(--ink3); font-weight: 600; flex-wrap: wrap; }
+.hm-legend .hm-c { width: 13px; height: 13px; border-radius: 3px; }
+@media (max-width: 640px) { .streak-stats { grid-template-columns: repeat(2, 1fr); } .modal { padding: 10px; } }
+
 </style>
 </head>
 <body>
@@ -2724,7 +2758,18 @@ var Profile = (function () {
     }
     p.stats = Object.assign({}, EMPTY_STATS, p.stats || {});
     p.days = Streak.normalize(p.days);
+    p.counts = cleanCounts(p.counts);
     return p;
+  }
+  // Число заданий по дням: { '2026-11-08': 5, ... }, храним последние 400 дней
+  function cleanCounts(c) {
+    const out = {};
+    if (!c || typeof c !== 'object') return out;
+    Object.keys(c).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort().slice(-400).forEach((k) => {
+      const v = Math.max(0, Math.min(10000, Math.floor(+c[k] || 0)));
+      if (v) out[k] = v;
+    });
+    return out;
   }
   let me = load();
 
@@ -2748,6 +2793,7 @@ var Profile = (function () {
       color: me.color | 0,
       stats: Object.assign({}, EMPTY_STATS, me.stats),
       days: Streak.normalize(me.days).slice(-400),
+      counts: cleanCounts(me.counts),
     };
   }
   function applyCloud(d) {
@@ -2766,6 +2812,10 @@ var Profile = (function () {
     me.days = Streak.normalize((d.days || []).concat(me.days || [])).slice(-400);
     if (me.days.length !== (Array.isArray(d.days) ? Streak.normalize(d.days).length : 0) && typeof Cloud !== 'undefined') setTimeout(() => Cloud.schedulePush(), 0);
     void before;
+    // задания по дням: берём большее из облака и устройства
+    const cc = cleanCounts(d.counts), lc = cleanCounts(me.counts);
+    Object.keys(lc).forEach((k) => { cc[k] = Math.max(cc[k] || 0, lc[k]); });
+    me.counts = cleanCounts(cc);
     saveLocal();
   }
   // При регистрации: имя и фото из Google, если своих нет
@@ -2795,7 +2845,7 @@ var Profile = (function () {
   }
   // После выхода из аккаунта — чистый профиль на этом устройстве
   function resetLocal() {
-    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [] };
+    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [], counts: {} };
     saveLocal();
   }
 
@@ -2917,12 +2967,13 @@ var Profile = (function () {
   // Отметить сегодняшний день в огоньке (вызывается при каждом ответе на задание)
   function markToday() {
     const t = Streak.today();
+    me.counts = cleanCounts(me.counts);
+    me.counts[t] = (me.counts[t] || 0) + 1;
     me.days = Streak.normalize(me.days);
-    if (me.days.indexOf(t) >= 0) return false;
-    me.days.push(t);
-    me.days = me.days.slice(-400);
+    const isNew = me.days.indexOf(t) < 0;
+    if (isNew) { me.days.push(t); me.days = me.days.slice(-400); }
     save();
-    return true;
+    return isNew;
   }
   const streak = () => Streak.info(me.days);
 
@@ -3606,50 +3657,92 @@ var Cloud = (function () {
   }
   const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
+  /* ---- окно огонька: серия + календарь активности по неделям ---- */
+  const MON_SHORT = ['янв.', 'февр.', 'март', 'апр.', 'май', 'июнь', 'июль', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.'];
+  const tasksWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'задание' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'задания' : 'заданий');
+  const level = (n) => (n <= 0 ? 0 : n <= 2 ? 1 : n <= 5 ? 2 : n <= 9 ? 3 : 4);
+
+  function heatmapHTML(weeks) {
+    const p = Profile.me;
+    const counts = p.counts || {};
+    const days = new Set(p.days || []);
+    const s = Profile.streak();
+    const skips = new Set(s.skips || []);
+    const today = new Date();
+    const todayKey = Streak.today();
+    const monday = Streak.addDays(today, -((today.getDay() + 6) % 7));
+    const start = Streak.addDays(monday, -7 * (weeks - 1));
+    let cols = '', months = '', lastMonth = -1;
+    for (let w = 0; w < weeks; w++) {
+      const wStart = Streak.addDays(start, 7 * w);
+      // подпись месяца над неделей, в которой начинается месяц
+      let label = '';
+      for (let i = 0; i < 7; i++) { const d = Streak.addDays(wStart, i); if (d.getDate() === 1 || (w === 0 && i === 0)) { if (d.getMonth() !== lastMonth) { label = MON_SHORT[d.getMonth()]; lastMonth = d.getMonth(); } break; } }
+      months += '<span class="hm-m">' + label + '</span>';
+      let col = '';
+      for (let i = 0; i < 7; i++) {
+        const d = Streak.addDays(wStart, i);
+        const k = Streak.key(d);
+        if (k > todayKey) { col += '<span class="hm-c future"></span>'; continue; }
+        const n = counts[k] || (days.has(k) ? 1 : 0);
+        const lv = level(n);
+        const cls = 'hm-c l' + lv + (skips.has(k) && !n ? ' skip' : '') + (k === todayKey ? ' today' : '');
+        const title = d.getDate() + ' ' + MON_SHORT[d.getMonth()] + ' ' + d.getFullYear() + ': ' + (n ? n + ' ' + tasksWord(n) : skips.has(k) ? 'пропуск (огонёк прощает)' : 'нет заданий');
+        col += '<span class="' + cls + '" title="' + title + '"></span>';
+      }
+      cols += '<div class="hm-col">' + col + '</div>';
+    }
+    return '<div class="hm-scroll" id="hm-scroll"><div class="hm">' +
+      '<div class="hm-months"><span class="hm-wd-pad"></span>' + months + '</div>' +
+      '<div class="hm-body"><div class="hm-wd"><span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span></div>' + cols + '</div>' +
+      '</div></div>' +
+      '<div class="hm-legend"><span>меньше</span><span class="hm-c l0"></span><span class="hm-c l1"></span><span class="hm-c l2"></span><span class="hm-c l3"></span><span class="hm-c l4"></span><span>больше</span><span class="sp"></span><span class="hm-c skip"></span><span>прощённый пропуск</span></div>';
+  }
+
   function streakCardHTML() {
     const s = Profile.streak();
     const on = s.state === 'lit' || s.state === 'pending';
-    const now = new Date();
-    const off = app.calOffset || 0;
-    const first = new Date(now.getFullYear(), now.getMonth() + off, 1);
-    const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-    const lead = (first.getDay() + 6) % 7; // понедельник — первый
-    const active = new Set(Profile.me.days || []);
-    const skips = new Set(s.skips || []);
-    const today = Streak.today();
-    let cells = '';
-    for (let i = 0; i < lead; i++) cells += '<span class="cal-cell empty"></span>';
-    for (let d = 1; d <= daysIn; d++) {
-      const k = Streak.key(new Date(first.getFullYear(), first.getMonth(), d));
-      const cls = ['cal-cell'];
-      let inner = `<span class="cal-num">${d}</span>`;
-      if (active.has(k)) { cls.push('hit'); inner = flame('', 22) + `<span class="cal-num">${d}</span>`; }
-      else if (skips.has(k)) { cls.push('skip'); inner = flame('off', 22) + `<span class="cal-num">${d}</span>`; }
-      if (k === today) cls.push('today');
-      if (k > today) cls.push('future');
-      cells += `<span class="${cls.join(' ')}" title="${k}">${inner}</span>`;
-    }
-    const canNext = off < 0;
-    return `<div class="streak-head">
-        <div class="streak-big ${on ? 'on' : ''}">${flame(on ? '' : 'off', 54)}</div>
-        <div><div class="streak-num">${s.count} <span>${daysWord(s.count)} подряд</span></div><div class="muted" style="font-size:13px">Рекорд: ${s.best} ${daysWord(s.best)}</div></div>
-      </div>
-      <div class="streak-msg ${s.state}">${streakText(s)}</div>
-      <div class="cal">
-        <div class="cal-top"><button type="button" class="cal-nav" data-cal="-1" aria-label="Предыдущий месяц">‹</button><b>${MONTHS[first.getMonth()]} ${first.getFullYear()}</b><button type="button" class="cal-nav" data-cal="1" ${canNext ? '' : 'disabled'} aria-label="Следующий месяц">›</button></div>
-        <div class="cal-grid cal-wd"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
-        <div class="cal-grid">${cells}</div>
-      </div>
-      <div class="hint">День засчитывается, если вы ответили хотя бы на одно задание — в соло или в дуэли. Один пропущенный день огонёк прощает: он сереет, а если решить задание на следующий день, серия восстановится. Два пропуска подряд — серия сгорает.</div>`;
+    const counts = Profile.me.counts || {};
+    const days = Profile.me.days || [];
+    const today = new Date();
+    const weekKeys = []; for (let i = 0; i < 7; i++) weekKeys.push(Streak.key(Streak.addDays(today, -i)));
+    const week = weekKeys.reduce((a, k) => a + (counts[k] || 0), 0);
+    const total = Object.keys(counts).reduce((a, k) => a + counts[k], 0);
+    const halfYear = Streak.key(Streak.addDays(today, -182));
+    const activeDays = days.filter((k) => k >= halfYear).length;
+    const narrow = window.innerWidth < 640;
+    return '<div class="streak-head">' +
+        '<div class="streak-big ' + (on ? 'on' : '') + '">' + flame(on ? '' : 'off', 54) + '</div>' +
+        '<div style="flex:1;min-width:0"><div class="streak-num">' + s.count + ' <span>' + daysWord(s.count) + ' подряд</span></div><div class="muted" style="font-size:13px">' + (s.state === 'lit' ? 'Сегодня огонёк уже горит' : s.state === 'pending' ? 'Сегодня ещё не решали' : s.state === 'frozen' ? 'Огонёк потух — ещё можно спасти' : 'Огонёк не горит') + '</div></div>' +
+        '<button type="button" class="modal-x" id="modal-close" aria-label="Закрыть">×</button>' +
+      '</div>' +
+      '<div class="streak-msg ' + s.state + '">' + streakText(s) + '</div>' +
+      '<div class="streak-stats">' +
+        '<div class="stat"><b>' + s.best + '</b><span>рекорд, ' + daysWord(s.best) + '</span></div>' +
+        '<div class="stat"><b>' + activeDays + '</b><span>активных дней за полгода</span></div>' +
+        '<div class="stat"><b>' + week + '</b><span>' + tasksWord(week) + ' за 7 дней</span></div>' +
+        '<div class="stat"><b>' + total + '</b><span>' + tasksWord(total) + ' всего</span></div>' +
+      '</div>' +
+      '<h3 style="margin:18px 0 10px">Активность</h3>' +
+      heatmapHTML(narrow ? 18 : 26) +
+      '<div class="hint" style="margin-top:12px">День засчитывается, если вы ответили хотя бы на одно задание — в соло или в дуэли. Один пропущенный день огонёк прощает: он сереет, а если решить задание на следующий день, серия восстановится. Два пропуска подряд — серия сгорает.</div>';
   }
 
-  function bindStreakCard() {
-    $$('[data-cal]').forEach((b) => (b.onclick = () => {
-      app.calOffset = Math.min(0, (app.calOffset || 0) + +b.dataset.cal);
-      const c = $('#streak-card');
-      if (c) { c.innerHTML = streakCardHTML(); bindStreakCard(); }
-    }));
+  function openStreak() {
+    let m = $('#modal');
+    if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
+    m.innerHTML = '<div class="modal-box card streak-modal" role="dialog" aria-label="Огонёк">' + streakCardHTML() + '</div>';
+    m.classList.add('show');
+    const sc = $('#hm-scroll'); if (sc) sc.scrollLeft = sc.scrollWidth;
+    const close = () => { m.classList.remove('show'); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    $('#modal-close').onclick = close;
+    m.onclick = (e) => { if (e.target === m) close(); };
   }
+
+  function bindStreakCard() {}
+
 
   /* ---------- аккаунт Google ---------- */
   const GOOGLE_G = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>';
@@ -3767,9 +3860,6 @@ var Cloud = (function () {
             </div>
             <div class="actions"><button type="button" class="link" id="stats-reset" style="color:var(--bad)">Сбросить статистику</button></div>
           </section>
-        </div>
-        <div class="stack profile-side">
-          <section class="card" id="streak-card">${streakCardHTML()}</section>
         </div>
       </div>
       </div>`;
@@ -4314,7 +4404,7 @@ var Cloud = (function () {
     $('.logo').onclick = () => { app.tab = 'duel'; render(); };
     $('#me-btn').onclick = () => { if (app.tab === 'profile') return; app.tab = 'profile'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#login-btn').onclick = doLogin;
-    $('#streak-btn').onclick = () => { if (app.tab === 'profile') { const c = $('#streak-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } app.tab = 'profile'; render(); animatePage(); setTimeout(() => { const c = $('#streak-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); };
+    $('#streak-btn').onclick = openStreak;
     setInterval(renderHeaderAvatar, 60000); // смена суток
     Cloud.on(onCloudChange);
     Cloud.init();
