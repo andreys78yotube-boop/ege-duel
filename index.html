@@ -13,6 +13,10 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="window.EGEApp && window.EGEApp.rerender()"></script>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>window.FIREBASE_CONFIG = {"projectId":"authzxc-ceb2c","appId":"1:1014134003399:web:28ea536cfa375ec0e1d0e2","storageBucket":"authzxc-ceb2c.firebasestorage.app","apiKey":"AIzaSyDUnQE9Q610wJlLLaUxuWzifV7Lo3vdfFA","authDomain":"authzxc-ceb2c.firebaseapp.com","messagingSenderId":"1014134003399","measurementId":"G-BEY1EMZN5B","projectNumber":"1014134003399","version":"2"};</script>
 <style>
 :root {
   --bg: #f4f2ee;
@@ -319,6 +323,11 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
   .theme-btn { margin-left: 0; }
 }
 .me-btn.on .ava { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+.login-btn { padding: 8px 14px; border-radius: 10px; margin-left: 8px; }
+.btn.google { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); }
+.btn.google:hover { border-color: var(--ink3); filter: none; }
+.g-ok { width: 36px; height: 36px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; flex: none; }
+@media (max-width: 760px) { .login-btn { margin-left: auto; } .login-btn:not(.hide) + .me-btn { margin-left: 0; } }
 
 </style>
 </head>
@@ -331,6 +340,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
       <button data-tab="solo">Соло</button>
       <button data-tab="rules">Правила</button>
     </nav>
+    <button class="btn soft login-btn hide" id="login-btn">Войти</button>
     <button class="me-btn" id="me-btn" title="Мой профиль" aria-label="Мой профиль"></button>
     <button class="theme-btn" id="theme" title="Светлая / тёмная тема" aria-label="Сменить тему">◐</button>
   </div>
@@ -2572,9 +2582,69 @@ var Profile = (function () {
   }
   let me = load();
 
-  function save() {
+  function saveLocal() {
     try { localStorage.setItem(KEY, JSON.stringify(me)); localStorage.setItem('egeduel:name', JSON.stringify(me.name)); return true; }
     catch (e) { return false; }
+  }
+  function save() {
+    const ok = saveLocal();
+    if (typeof Cloud !== 'undefined') Cloud.schedulePush();
+    return ok;
+  }
+
+  /* ---- синхронизация с аккаунтом ---- */
+  function cloudData() {
+    return {
+      name: String(me.name || '').slice(0, 24),
+      bio: String(me.bio || '').slice(0, BIO_MAX),
+      photo: me.photo || null,
+      preset: me.preset | 0,
+      color: me.color | 0,
+      stats: Object.assign({}, EMPTY_STATS, me.stats),
+    };
+  }
+  function applyCloud(d) {
+    if (!d || typeof d !== 'object') return;
+    const int = (v) => Math.max(0, Math.floor(+v || 0));
+    me.name = String(d.name || '').slice(0, 24);
+    me.bio = String(d.bio || '').slice(0, BIO_MAX);
+    me.photo = typeof d.photo === 'string' && d.photo.indexOf('data:image/') === 0 && d.photo.length <= PHOTO_MAX ? d.photo : null;
+    me.preset = Math.abs(d.preset | 0) % PRESETS.length;
+    me.color = Math.abs(d.color | 0) % COLORS.length;
+    const st = {};
+    Object.keys(EMPTY_STATS).forEach((k) => { st[k] = int(d.stats && d.stats[k]); });
+    me.stats = st;
+    saveLocal();
+  }
+  // При регистрации: имя и фото из Google, если своих нет
+  async function fillFromGoogle(u) {
+    if (!me.name && u.displayName) me.name = u.displayName.slice(0, 24);
+    if (!me.photo && u.photoURL) {
+      try { me.photo = await photoFromUrl(u.photoURL); } catch (e) {}
+    }
+    saveLocal();
+  }
+  function photoFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+          const side = Math.min(img.naturalWidth, img.naturalHeight);
+          c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, 128, 128);
+          const d = c.toDataURL('image/jpeg', 0.85);
+          d.length <= PHOTO_MAX ? resolve(d) : reject(new Error('big'));
+        } catch (e) { reject(e); }
+      };
+      img.onerror = reject;
+      img.src = url.replace(/=s\d+-c$/, '=s256-c');
+    });
+  }
+  // После выхода из аккаунта — чистый профиль на этом устройстве
+  function resetLocal() {
+    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS) };
+    saveLocal();
   }
 
   // Визитка для соперника
@@ -2692,8 +2762,108 @@ var Profile = (function () {
   function resetStats() { me.stats = Object.assign({}, EMPTY_STATS); save(); }
 
   return {
-    get me() { return me; }, save, shared, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
+    get me() { return me; }, save, shared, cloudData, applyCloud, fillFromGoogle, resetLocal, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
     PRESETS, COLORS, BIO_MAX, esc,
+  };
+})();
+
+;
+/* ===== Аккаунт: вход через Google (Firebase Auth) и хранение профиля (Firestore) =====
+   Первый вход через Google = регистрация: создаётся документ users/{uid} из текущего профиля.
+   Дальше профиль и статистика синхронизируются с аккаунтом и доступны на любом устройстве. */
+var Cloud = (function () {
+  const CONFIG = window.FIREBASE_CONFIG || null;
+  let auth = null, db = null, user = null, ready = false, saveTimer = null, lastError = '';
+  const subs = [];
+  const emit = () => subs.forEach((f) => { try { f(); } catch (e) {} });
+
+  const available = () => !!(CONFIG && window.firebase && window.firebase.initializeApp);
+
+  const ERR = {
+    'auth/unauthorized-domain': 'Этот адрес сайта не разрешён для входа через Google.',
+    'auth/network-request-failed': 'Нет связи с сервером Google. Проверьте интернет.',
+    'auth/too-many-requests': 'Слишком много попыток. Попробуйте позже.',
+    'auth/internal-error': 'Ошибка Google. Попробуйте ещё раз.',
+    'permission-denied': 'Нет доступа к данным аккаунта.',
+  };
+  const msg = (e) => (e && (ERR[e.code] || e.message)) || 'Неизвестная ошибка';
+
+  function init() {
+    if (!available()) { ready = true; emit(); return; }
+    try {
+      firebase.initializeApp(CONFIG);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      auth.useDeviceLanguage();
+    } catch (e) { ready = true; lastError = msg(e); emit(); return; }
+    auth.getRedirectResult().catch((e) => { lastError = msg(e); emit(); });
+    auth.onAuthStateChanged(async (u) => {
+      user = u;
+      if (u) {
+        try { await pull(); lastError = ''; } catch (e) { lastError = 'Не удалось загрузить профиль: ' + msg(e); }
+      }
+      ready = true;
+      emit();
+    });
+  }
+
+  async function signIn() {
+    if (!available()) throw new Error('Вход через Google не настроен');
+    const p = new firebase.auth.GoogleAuthProvider();
+    p.setCustomParameters({ prompt: 'select_account' });
+    try {
+      await auth.signInWithPopup(p);
+    } catch (e) {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') { await auth.signInWithRedirect(p); return; }
+      throw new Error(msg(e));
+    }
+  }
+
+  async function signOut() {
+    clearTimeout(saveTimer);
+    if (user) { try { await push(); } catch (e) {} }
+    await auth.signOut();
+    Profile.resetLocal();
+    emit();
+  }
+
+  const ref = () => db.collection('users').doc(user.uid);
+
+  async function pull() {
+    const snap = await ref().get();
+    if (snap.exists) {
+      Profile.applyCloud(snap.data());
+      Profile.me.isNew = false;
+    } else {
+      // регистрация: берём текущий профиль, имя и фото — из Google, если своих нет
+      await Profile.fillFromGoogle(user);
+      await push();
+      Profile.me.isNew = true;
+    }
+  }
+
+  async function push() {
+    if (!user) return;
+    const d = Profile.cloudData();
+    d.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+    await ref().set(d);
+  }
+
+  function schedulePush() {
+    if (!user) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { push().catch((e) => { lastError = 'Не удалось сохранить в аккаунт: ' + msg(e); emit(); }); }, 900);
+  }
+
+  return {
+    init, signIn, signOut, schedulePush,
+    on: (f) => subs.push(f),
+    get available() { return available(); },
+    get ready() { return ready; },
+    get user() { return user; },
+    get error() { return lastError; },
+    clearError() { lastError = ''; },
   };
 })();
 
@@ -3222,6 +3392,51 @@ var Profile = (function () {
   function renderHeaderAvatar() {
     const b = $('#me-btn');
     if (b) { b.innerHTML = Profile.avatar(Profile.shared(), 34); b.classList.toggle('on', app.tab === 'profile'); }
+    const l = $('#login-btn');
+    if (l) l.classList.toggle('hide', !(Cloud.available && Cloud.ready && !Cloud.user));
+  }
+
+  /* ---------- аккаунт Google ---------- */
+  const GOOGLE_G = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>';
+
+  function accountHTML() {
+    const err = Cloud.error ? `<div class="notice bad" style="margin-top:12px">${esc(Cloud.error)}</div>` : '';
+    if (!Cloud.ready) return `<h3>Аккаунт</h3><div class="waiting"><span class="dot-pulse"></span> Проверяем вход…</div>`;
+    const u = Cloud.user;
+    if (u) {
+      return `<h3>Аккаунт</h3>
+        <div class="row"><span class="g-ok">${GOOGLE_G}</span><div style="min-width:0;flex:1"><div style="font-weight:800">Вы вошли через Google</div><div class="muted" style="font-size:14px;overflow-wrap:anywhere">${esc(u.email || u.displayName || '')}</div></div><button class="btn ghost" id="logout">Выйти</button></div>
+        <div class="hint">Профиль и статистика сохраняются в аккаунте — войдите с любого устройства, и всё будет на месте.</div>${err}`;
+    }
+    return `<h3>Аккаунт</h3>
+      <p class="muted" style="margin:0 0 14px;font-size:14px">Войдите через Google, чтобы профиль и статистика сохранялись в аккаунте и были доступны на телефоне и компьютере. Первый вход — это и есть регистрация.</p>
+      <button class="btn google wide" id="login">${GOOGLE_G} Войти через Google</button>${err}`;
+  }
+
+  async function doLogin() {
+    Cloud.clearError();
+    try { await Cloud.signIn(); }
+    catch (e) { toast(e.message || 'Не удалось войти'); }
+  }
+
+  function bindAccount() {
+    if ($('#login')) $('#login').onclick = doLogin;
+    if ($('#logout')) $('#logout').onclick = async () => {
+      if (app.game && app.game.mode !== 'solo' && app.game.S && app.game.S.phase !== 'over') { toast('Сначала завершите дуэль'); return; }
+      await Cloud.signOut();
+      app.name = '';
+      toast('Вы вышли из аккаунта');
+    };
+  }
+
+  function onCloudChange() {
+    app.name = Profile.me.name || '';
+    renderHeaderAvatar();
+    if (Cloud.user && Profile.me.isNew) { Profile.me.isNew = false; toast('Аккаунт создан! Профиль сохранён в Google-аккаунте'); }
+    if (app.tab === 'profile' && !(app.game && app.tab === (app.game.mode === 'solo' ? 'solo' : 'duel'))) renderProfile();
+    else if (!app.game) {
+      $$('[data-name]').forEach((inp) => { if (inp !== document.activeElement) inp.value = app.name; });
+    }
   }
 
   // Соперник: его визитка или заглушка по имени
@@ -3251,7 +3466,7 @@ var Profile = (function () {
     main().innerHTML = `
       <div id="profile-page">
       <h1>Мой профиль</h1>
-      <p class="lead">Так вас увидит соперник в дуэли: аватар, имя и пара слов о себе. Профиль хранится в этом браузере — регистрация не нужна.</p>
+      <p class="lead">Так вас увидит соперник в дуэли: аватар, имя и пара слов о себе. ${Cloud.user ? "Профиль сохраняется в вашем Google-аккаунте." : "Без входа профиль хранится только в этом браузере. Войдите через Google, чтобы он сохранялся в аккаунте."}</p>
       <div class="grid2">
         <section class="card">
           <h2>Аватар</h2>
@@ -3278,6 +3493,7 @@ var Profile = (function () {
           </div>
         </section>
         <div class="stack">
+          ${Cloud.available ? `<section class="card" id="acc-card">${accountHTML()}</section>` : ''}
           <section class="card">
             <h3>Так вас видит соперник</h3>
             <div id="p-preview">${Profile.card(Profile.shared())}</div>
@@ -3300,6 +3516,7 @@ var Profile = (function () {
       </div>
       </div>`;
     bindCommon();
+    bindAccount();
     const bio = $('#p-bio');
     bio.addEventListener('input', () => {
       Profile.me.bio = bio.value.slice(0, Profile.BIO_MAX);
@@ -3833,6 +4050,9 @@ var Profile = (function () {
     $$('nav.tabs button').forEach((b) => (b.onclick = () => { app.tab = b.dataset.tab; app.joinError = ''; render(); window.scrollTo(0, 0); }));
     $('.logo').onclick = () => { app.tab = 'duel'; render(); };
     $('#me-btn').onclick = () => { app.tab = 'profile'; render(); window.scrollTo(0, 0); };
+    $('#login-btn').onclick = doLogin;
+    Cloud.on(onCloudChange);
+    Cloud.init();
     const tb = $('#theme');
     const applyTheme = (t) => { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); };
     applyTheme(store.get('egeduel:theme', null));
