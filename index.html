@@ -85,9 +85,17 @@ header.top .wrap { display: flex; align-items: center; gap: 16px; height: 64px; 
 .logo { display: flex; align-items: center; gap: 10px; font-family: "Unbounded", "Manrope", sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -.01em; white-space: nowrap; cursor: pointer; }
 .logo .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 15px; }
 .logo small { font-family: "Manrope", sans-serif; font-weight: 600; color: var(--ink3); font-size: 12px; display: block; letter-spacing: 0; margin-top: -3px; }
-nav.tabs { display: flex; gap: 4px; margin-left: auto; background: var(--bg2); padding: 4px; border-radius: 12px; }
-nav.tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 9px; cursor: pointer; font-weight: 600; color: var(--ink2); }
-nav.tabs button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+nav.tabs { display: flex; gap: 4px; margin-left: auto; background: var(--bg2); padding: 4px; border-radius: 12px; position: relative; }
+nav.tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 9px; cursor: pointer; font-weight: 600; color: var(--ink2); position: relative; z-index: 1; transition: color .25s ease; }
+nav.tabs button:hover { color: var(--ink); }
+nav.tabs button.on { color: var(--ink); }
+/* плавающая подложка активной вкладки */
+.tab-pill { position: absolute; top: 4px; left: 0; height: calc(100% - 8px); width: 0; border-radius: 9px; background: var(--card); box-shadow: var(--shadow); z-index: 0; pointer-events: none; opacity: 0; }
+.tab-pill.anim { transition: transform .35s cubic-bezier(.4, 0, .2, 1), width .35s cubic-bezier(.4, 0, .2, 1), opacity .2s ease; }
+/* мягкое появление содержимого при смене вкладки */
+.page-in { animation: pageIn .32s ease both; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tab-pill.anim { transition: none; } .page-in { animation: none; } }
 .theme-btn { border: 1px solid var(--line); background: var(--card); width: 38px; height: 38px; border-radius: 10px; cursor: pointer; display: grid; place-items: center; }
 
 main { padding: 28px 0 60px; }
@@ -340,6 +348,7 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
   <div class="wrap">
     <div class="logo" title="На главную"><span class="mark">∫</span><div>ЕГЭ Дуэль<small>профильная математика · 2027</small></div></div>
     <nav class="tabs">
+      <span class="tab-pill" aria-hidden="true"></span>
       <button data-tab="duel">Дуэль</button>
       <button data-tab="solo">Соло</button>
       <button data-tab="rules">Правила</button>
@@ -3371,6 +3380,7 @@ var Cloud = (function () {
 
   function render() {
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === app.tab));
+    movePill();
     renderHeaderAvatar();
     const g = app.game;
     if (g && g.S && g.S.phase === 'over') recordResult(g);
@@ -3381,6 +3391,24 @@ var Cloud = (function () {
     if (app.tab === 'duel') renderDuelHome();
     else if (app.tab === 'solo') renderSoloHome();
     else renderRules();
+  }
+
+  // Подложка активной вкладки плавно переезжает под нажатую кнопку
+  function movePill() {
+    const pill = $('.tab-pill');
+    if (!pill) return;
+    const btn = $('nav.tabs button.on');
+    if (!btn) { pill.style.opacity = '0'; return; }
+    pill.style.width = btn.offsetWidth + 'px';
+    pill.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+    pill.style.opacity = '1';
+  }
+  function animatePage() {
+    const m = main();
+    if (!m) return;
+    m.classList.remove('page-in');
+    void m.offsetWidth;
+    m.classList.add('page-in');
   }
 
   /* ---------- профиль ---------- */
@@ -4051,9 +4079,13 @@ var Cloud = (function () {
 
   /* ---------- старт ---------- */
   function init() {
-    $$('nav.tabs button').forEach((b) => (b.onclick = () => { app.tab = b.dataset.tab; app.joinError = ''; render(); window.scrollTo(0, 0); }));
+    $$('nav.tabs button').forEach((b) => (b.onclick = () => { if (app.tab === b.dataset.tab) return; app.tab = b.dataset.tab; app.joinError = ''; render(); animatePage(); window.scrollTo(0, 0); }));
+    window.addEventListener('resize', movePill);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(movePill);
+    movePill();
+    setTimeout(() => { movePill(); const p = $('.tab-pill'); if (p) p.classList.add('anim'); }, 60);
     $('.logo').onclick = () => { app.tab = 'duel'; render(); };
-    $('#me-btn').onclick = () => { app.tab = 'profile'; render(); window.scrollTo(0, 0); };
+    $('#me-btn').onclick = () => { if (app.tab === 'profile') return; app.tab = 'profile'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#login-btn').onclick = doLogin;
     Cloud.on(onCloudChange);
     Cloud.init();
