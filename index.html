@@ -318,6 +318,7 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
   .me-btn { margin-left: auto; }
   .theme-btn { margin-left: 0; }
 }
+.me-btn.on .ava { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
 
 </style>
 </head>
@@ -329,7 +330,6 @@ textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
       <button data-tab="duel">Дуэль</button>
       <button data-tab="solo">Соло</button>
       <button data-tab="rules">Правила</button>
-      <button data-tab="profile">Профиль</button>
     </nav>
     <button class="me-btn" id="me-btn" title="Мой профиль" aria-label="Мой профиль"></button>
     <button class="theme-btn" id="theme" title="Светлая / тёмная тема" aria-label="Сменить тему">◐</button>
@@ -3221,7 +3221,7 @@ var Profile = (function () {
 
   function renderHeaderAvatar() {
     const b = $('#me-btn');
-    if (b) b.innerHTML = Profile.avatar(Profile.shared(), 34);
+    if (b) { b.innerHTML = Profile.avatar(Profile.shared(), 34); b.classList.toggle('on', app.tab === 'profile'); }
   }
 
   // Соперник: его визитка или заглушка по имени
