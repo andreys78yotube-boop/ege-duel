@@ -354,6 +354,58 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 /* логотип-картинка */
 .logo .mark-img { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; display: block; box-shadow: 0 0 0 1px var(--line); background: #141724; }
 
+/* ---------- огонёк ---------- */
+.flame { display: block; flex: none; overflow: visible; }
+.flame .fl-body { fill: url(#fl-g); }
+.flame .fl-core { fill: rgba(255, 245, 200, .85); }
+.flame.off { filter: grayscale(1); opacity: .45; }
+.streak-btn { display: inline-flex; align-items: center; gap: 3px; border: 0; background: var(--bg2); border-radius: 999px; padding: 5px 10px 5px 7px; cursor: pointer; font-weight: 800; font-size: 14px; color: var(--ink3); margin-left: 8px; transition: transform .15s; }
+.streak-btn:hover { transform: scale(1.05); }
+.streak-btn.on { color: #ff7a00; }
+.streak-btn.on .flame { animation: flicker 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.streak-btn.pending .flame { animation: none; opacity: .8; }
+@keyframes flicker { 0%, 100% { transform: scale(1) rotate(0); } 25% { transform: scale(1.06, .97) rotate(-2deg); } 50% { transform: scale(.97, 1.05) rotate(1.5deg); } 75% { transform: scale(1.04, .98) rotate(-1deg); } }
+.me-btn { margin-left: 6px; }
+.streak-head { display: flex; align-items: center; gap: 14px; }
+.streak-big { width: 64px; height: 64px; border-radius: 18px; background: var(--bg2); display: grid; place-items: center; }
+.streak-big.on { background: rgba(255, 122, 0, .14); }
+.streak-big.on .flame { animation: flicker 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.streak-num { font-family: "Unbounded", sans-serif; font-size: 30px; font-weight: 800; line-height: 1.1; }
+.streak-num span { font-family: "Manrope", sans-serif; font-size: 15px; font-weight: 700; color: var(--ink2); }
+.streak-msg { margin: 14px 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; background: var(--bg2); color: var(--ink2); }
+.streak-msg.lit { background: rgba(255, 122, 0, .12); color: #e8590c; }
+.streak-msg.frozen, .streak-msg.lost { background: var(--bad-soft); color: var(--bad); }
+.cal { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--bg); }
+.cal-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-nav { border: 0; background: var(--bg2); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: 700; }
+.cal-nav:disabled { opacity: .35; cursor: default; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-wd span { text-align: center; font-size: 11px; font-weight: 700; color: var(--ink3); padding-bottom: 2px; }
+.cal-cell { aspect-ratio: 1; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--ink2); position: relative; }
+.cal-cell.empty { visibility: hidden; }
+.cal-cell.future { color: var(--ink3); opacity: .5; }
+.cal-cell.hit { background: rgba(255, 122, 0, .13); color: #e8590c; }
+.cal-cell.skip { background: var(--bg2); color: var(--ink3); }
+.cal-cell.hit .cal-num, .cal-cell.skip .cal-num { font-size: 10px; line-height: 1; margin-top: -1px; }
+.cal-cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+@media (prefers-reduced-motion: reduce) { .streak-btn.on .flame, .streak-big.on .flame { animation: none; } }
+@media (max-width: 760px) { .streak-btn { margin-left: auto; } .streak-btn + .me-btn, .login-btn:not(.hide) ~ .streak-btn { margin-left: 6px; } .login-btn:not(.hide) + .streak-btn { margin-left: 6px; } }
+
+/* шапка на телефоне: логотип слева, кнопки справа в одну строку */
+@media (max-width: 760px) {
+  header.top .wrap { gap: 6px; }
+  .logo { font-size: 16px; gap: 8px; }
+  .logo small { display: none; }
+  .login-btn, .streak-btn, .me-btn, .theme-btn { margin-left: 0 !important; }
+  .login-btn:not(.hide) { margin-left: auto !important; padding: 7px 11px; font-size: 14px; }
+  .login-btn.hide + .streak-btn { margin-left: auto !important; }
+}
+@media (max-width: 430px) {
+  .logo > div { display: none; }
+  .theme-btn { width: 34px; height: 34px; }
+  .me-btn { width: 34px; height: 34px; }
+}
+
 </style>
 </head>
 <body>
@@ -367,6 +419,7 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
       <button data-tab="rules">Правила</button>
     </nav>
     <button class="btn soft login-btn hide" id="login-btn">Войти</button>
+    <button class="streak-btn" id="streak-btn" aria-label="Огонёк — серия дней"></button>
     <button class="me-btn" id="me-btn" title="Мой профиль" aria-label="Мой профиль"></button>
     <button class="theme-btn" id="theme" title="Светлая / тёмная тема" aria-label="Сменить тему">◐</button>
   </div>
@@ -2581,6 +2634,65 @@ var Net = (function () {
 })();
 
 ;
+/* ===== Огонёк (серия дней) =====
+   День засчитывается, если игрок ответил хотя бы на одно задание (соло или дуэль).
+   Правила:
+   - сегодня уже решал → огонёк горит;
+   - вчера решал, сегодня ещё нет → огонёк горит (день ещё не закончился);
+   - пропущен ровно один день (последняя активность позавчера) → огонёк серый, серия сохраняется;
+     если решить сегодня — серия восстанавливается;
+   - пропущено два дня подряд и больше → серия сгорает (0). */
+var Streak = (function () {
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  // разница в днях по календарю (без влияния перехода на летнее время)
+  const diff = (a, b) => Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 864e5);
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+
+  function normalize(days) {
+    const set = new Set((Array.isArray(days) ? days : []).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)));
+    return Array.from(set).sort();
+  }
+
+  // Цепочки активных дней, в которых между соседними днями пропущено не больше одного дня
+  function chains(days) {
+    const ds = normalize(days).map(parse);
+    const out = [];
+    let cur = null;
+    ds.forEach((d) => {
+      if (cur && diff(d, cur.last) <= 2) { cur.count++; cur.last = d; if (diff(d, cur.prev) === 2) cur.skips.push(addDays(d, -1)); cur.prev = d; }
+      else { cur = { first: d, last: d, prev: d, count: 1, skips: [] }; out.push(cur); }
+    });
+    return out;
+  }
+
+  function info(days, now) {
+    now = now || new Date();
+    const ch = chains(days);
+    const best = ch.reduce((m, c) => Math.max(m, c.count), 0);
+    const last = ch[ch.length - 1];
+    if (!last) return { count: 0, state: 'none', best, doneToday: false, skips: [] };
+    const gap = diff(now, last.last);
+    let state;
+    if (gap <= 0) state = 'lit';          // сегодня уже решал
+    else if (gap === 1) state = 'pending'; // вчера решал, сегодня ещё нет
+    else if (gap === 2) state = 'frozen';  // пропущен один день — серый огонёк
+    else state = 'lost';                   // серия сгорела
+    const skips = last.skips.slice();
+    if (state === 'frozen') skips.push(addDays(now, -1));
+    return {
+      count: state === 'lost' ? 0 : last.count,
+      state, best, doneToday: gap <= 0, skips: state === 'lost' ? [] : skips.map(key),
+      chainFirst: state === 'lost' ? null : key(last.first),
+    };
+  }
+
+  return { key, parse, info, normalize, addDays, diff, today: () => key(new Date()) };
+})();
+if (typeof module !== 'undefined') module.exports = Streak;
+
+;
 /* ===== Профиль игрока: аватар, описание, статистика =====
    Профиль хранится в браузере (localStorage). В дуэли его «визитка»
    (имя, аватар, описание и пара цифр статистики) передаётся сопернику. */
@@ -2604,6 +2716,7 @@ var Profile = (function () {
       p = { name: name || '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length) };
     }
     p.stats = Object.assign({}, EMPTY_STATS, p.stats || {});
+    p.days = Streak.normalize(p.days);
     return p;
   }
   let me = load();
@@ -2627,6 +2740,7 @@ var Profile = (function () {
       preset: me.preset | 0,
       color: me.color | 0,
       stats: Object.assign({}, EMPTY_STATS, me.stats),
+      days: Streak.normalize(me.days).slice(-400),
     };
   }
   function applyCloud(d) {
@@ -2640,6 +2754,11 @@ var Profile = (function () {
     const st = {};
     Object.keys(EMPTY_STATS).forEach((k) => { st[k] = int(d.stats && d.stats[k]); });
     me.stats = st;
+    // дни активности: объединяем облачные и местные, чтобы не потерять сегодняшнюю серию
+    const before = Streak.normalize(me.days).length;
+    me.days = Streak.normalize((d.days || []).concat(me.days || [])).slice(-400);
+    if (me.days.length !== (Array.isArray(d.days) ? Streak.normalize(d.days).length : 0) && typeof Cloud !== 'undefined') setTimeout(() => Cloud.schedulePush(), 0);
+    void before;
     saveLocal();
   }
   // При регистрации: имя и фото из Google, если своих нет
@@ -2669,7 +2788,7 @@ var Profile = (function () {
   }
   // После выхода из аккаунта — чистый профиль на этом устройстве
   function resetLocal() {
-    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS) };
+    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [] };
     saveLocal();
   }
 
@@ -2681,7 +2800,7 @@ var Profile = (function () {
       photo: me.photo || null,
       preset: me.preset | 0,
       color: me.color | 0,
-      stats: { duels: me.stats.duels, wins: me.stats.wins, bestSolo: me.stats.bestSolo },
+      stats: { duels: me.stats.duels, wins: me.stats.wins, bestSolo: me.stats.bestSolo, streak: Streak.info(me.days).count },
     };
   }
 
@@ -2697,7 +2816,7 @@ var Profile = (function () {
       photo,
       preset: Math.abs(p.preset | 0) % PRESETS.length,
       color: Math.abs(p.color | 0) % COLORS.length,
-      stats: { duels: int(st.duels), wins: int(st.wins), bestSolo: int(st.bestSolo) },
+      stats: { duels: int(st.duels), wins: int(st.wins), bestSolo: int(st.bestSolo), streak: Math.min(int(st.streak), 5000) },
     };
   }
 
@@ -2722,6 +2841,7 @@ var Profile = (function () {
     parts.push(`⚔️ ${st.duels} ${plural(st.duels, 'дуэль', 'дуэли', 'дуэлей')}`);
     parts.push(`🏆 ${st.wins} ${plural(st.wins, 'победа', 'победы', 'побед')}`);
     if (st.bestSolo) parts.push(`🎯 рекорд соло: ${st.bestSolo}`);
+    if (st.streak) parts.push(`🔥 ${st.streak} ${plural(st.streak, 'день', 'дня', 'дней')} подряд`);
     return parts.join(' · ');
   }
 
@@ -2787,8 +2907,20 @@ var Profile = (function () {
 
   function resetStats() { me.stats = Object.assign({}, EMPTY_STATS); save(); }
 
+  // Отметить сегодняшний день в огоньке (вызывается при каждом ответе на задание)
+  function markToday() {
+    const t = Streak.today();
+    me.days = Streak.normalize(me.days);
+    if (me.days.indexOf(t) >= 0) return false;
+    me.days.push(t);
+    me.days = me.days.slice(-400);
+    save();
+    return true;
+  }
+  const streak = () => Streak.info(me.days);
+
   return {
-    get me() { return me; }, save, shared, cloudData, applyCloud, fillFromGoogle, resetLocal, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
+    get me() { return me; }, save, shared, cloudData, applyCloud, fillFromGoogle, resetLocal, markToday, streak, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
     PRESETS, COLORS, BIO_MAX, esc,
   };
 })();
@@ -3251,10 +3383,12 @@ var Cloud = (function () {
       const msg = guestSend('answer', { value: String(value) });
       g.ui.pendingAnswer = { round: g.S.round, msg, at: Date.now(), value: String(value) };
       g.ui.myValue = String(value);
+      if (Profile.markToday()) renderHeaderAvatar();
       render();
       return;
     }
     g.ui.myValue = String(value);
+    if (Profile.markToday()) renderHeaderAvatar();
     if (submitAnswer(g.S, g.P, 'host', value)) commit();
   }
 
@@ -3439,6 +3573,75 @@ var Cloud = (function () {
     if (b) { b.innerHTML = Profile.avatar(Profile.shared(), 34); b.classList.toggle('on', app.tab === 'profile'); }
     const l = $('#login-btn');
     if (l) l.classList.toggle('hide', !(Cloud.available && Cloud.ready && !Cloud.user));
+    const sb = $('#streak-btn');
+    if (sb) {
+      const s = Profile.streak();
+      const on = s.state === 'lit' || s.state === 'pending';
+      sb.innerHTML = flame(on ? '' : 'off', 20) + `<b>${s.count}</b>`;
+      sb.className = 'streak-btn' + (on ? ' on' : '') + (s.state === 'pending' ? ' pending' : '');
+      sb.title = streakText(s);
+    }
+  }
+
+  /* ---------- огонёк ---------- */
+  const FLAME_PATH = 'M12 1.8c.9 3.3-1.4 5-1.4 7.4 0 1.2.8 2 1.8 2 1.3 0 2.1-1.1 1.7-2.9 2.4 1.6 4.2 4.3 4.2 7.3 0 3.7-2.8 6.6-6.3 6.6S5.7 19.3 5.7 15.7c0-2.5 1.2-4.4 2.6-5.9 1.6-1.7 3.3-4 3.7-8z';
+  const FLAME_CORE = 'M12 13.4c.4 1.6-.8 2.3-.8 3.4 0 .8.6 1.3 1.2 1.3 1 0 1.6-.9 1.6-2 0-1-.6-1.9-2-2.7z';
+  function flame(cls, size) {
+    return `<svg class="flame ${cls || ''}" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><defs><linearGradient id="fl-g" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff3d00"/><stop offset=".6" stop-color="#ff8a00"/><stop offset="1" stop-color="#ffd000"/></linearGradient></defs><path class="fl-body" d="${FLAME_PATH}"/><path class="fl-core" d="${FLAME_CORE}"/></svg>`;
+  }
+  const daysWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'дня' : 'дней');
+  function streakText(s) {
+    if (s.state === 'none') return 'Решите любое задание, чтобы зажечь огонёк.';
+    if (s.state === 'lit') return 'Огонёк горит! Сегодня задание уже решено — возвращайтесь завтра.';
+    if (s.state === 'pending') return 'Решите хотя бы одно задание сегодня, чтобы продлить серию.';
+    if (s.state === 'frozen') return 'Вчера вы пропустили день — огонёк потух. Решите задание сегодня, и серия восстановится!';
+    return 'Серия сгорела: пропущено два дня подряд. Начните новую — решите задание сегодня.';
+  }
+  const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+  function streakCardHTML() {
+    const s = Profile.streak();
+    const on = s.state === 'lit' || s.state === 'pending';
+    const now = new Date();
+    const off = app.calOffset || 0;
+    const first = new Date(now.getFullYear(), now.getMonth() + off, 1);
+    const daysIn = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    const lead = (first.getDay() + 6) % 7; // понедельник — первый
+    const active = new Set(Profile.me.days || []);
+    const skips = new Set(s.skips || []);
+    const today = Streak.today();
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<span class="cal-cell empty"></span>';
+    for (let d = 1; d <= daysIn; d++) {
+      const k = Streak.key(new Date(first.getFullYear(), first.getMonth(), d));
+      const cls = ['cal-cell'];
+      let inner = `<span class="cal-num">${d}</span>`;
+      if (active.has(k)) { cls.push('hit'); inner = flame('', 22) + `<span class="cal-num">${d}</span>`; }
+      else if (skips.has(k)) { cls.push('skip'); inner = flame('off', 22) + `<span class="cal-num">${d}</span>`; }
+      if (k === today) cls.push('today');
+      if (k > today) cls.push('future');
+      cells += `<span class="${cls.join(' ')}" title="${k}">${inner}</span>`;
+    }
+    const canNext = off < 0;
+    return `<div class="streak-head">
+        <div class="streak-big ${on ? 'on' : ''}">${flame(on ? '' : 'off', 54)}</div>
+        <div><div class="streak-num">${s.count} <span>${daysWord(s.count)} подряд</span></div><div class="muted" style="font-size:13px">Рекорд: ${s.best} ${daysWord(s.best)}</div></div>
+      </div>
+      <div class="streak-msg ${s.state}">${streakText(s)}</div>
+      <div class="cal">
+        <div class="cal-top"><button type="button" class="cal-nav" data-cal="-1" aria-label="Предыдущий месяц">‹</button><b>${MONTHS[first.getMonth()]} ${first.getFullYear()}</b><button type="button" class="cal-nav" data-cal="1" ${canNext ? '' : 'disabled'} aria-label="Следующий месяц">›</button></div>
+        <div class="cal-grid cal-wd"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="cal-grid">${cells}</div>
+      </div>
+      <div class="hint">День засчитывается, если вы ответили хотя бы на одно задание — в соло или в дуэли. Один пропущенный день огонёк прощает: он сереет, а если решить задание на следующий день, серия восстановится. Два пропуска подряд — серия сгорает.</div>`;
+  }
+
+  function bindStreakCard() {
+    $$('[data-cal]').forEach((b) => (b.onclick = () => {
+      app.calOffset = Math.min(0, (app.calOffset || 0) + +b.dataset.cal);
+      const c = $('#streak-card');
+      if (c) { c.innerHTML = streakCardHTML(); bindStreakCard(); }
+    }));
   }
 
   /* ---------- аккаунт Google ---------- */
@@ -3538,6 +3741,7 @@ var Cloud = (function () {
           </div>
         </section>
         <div class="stack">
+          <section class="card" id="streak-card">${streakCardHTML()}</section>
           ${Cloud.available ? `<section class="card" id="acc-card">${accountHTML()}</section>` : ''}
           <section class="card">
             <h3>Так вас видит соперник</h3>
@@ -3562,6 +3766,7 @@ var Cloud = (function () {
       </div>`;
     bindCommon();
     bindAccount();
+    bindStreakCard();
     const bio = $('#p-bio');
     bio.addEventListener('input', () => {
       Profile.me.bio = bio.value.slice(0, Profile.BIO_MAX);
@@ -4100,6 +4305,8 @@ var Cloud = (function () {
     $('.logo').onclick = () => { app.tab = 'duel'; render(); };
     $('#me-btn').onclick = () => { if (app.tab === 'profile') return; app.tab = 'profile'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#login-btn').onclick = doLogin;
+    $('#streak-btn').onclick = () => { if (app.tab === 'profile') { const c = $('#streak-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } app.tab = 'profile'; render(); animatePage(); setTimeout(() => { const c = $('#streak-card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); };
+    setInterval(renderHeaderAvatar, 60000); // смена суток
     Cloud.on(onCloudChange);
     Cloud.init();
     const tb = $('#theme');
