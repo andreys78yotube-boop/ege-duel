@@ -278,6 +278,47 @@ h3 { font-size: 15px; margin: 0 0 10px; }
   .conn { top: auto; bottom: 16px; right: 16px; }
 }
 
+/* ---------- профиль ---------- */
+.ava { display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; flex: none; line-height: 1; user-select: none; box-shadow: 0 0 0 2px var(--card); }
+.ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.me-btn { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; display: grid; place-items: center; width: 38px; height: 38px; }
+.me-btn:hover .ava { box-shadow: 0 0 0 2px var(--accent); }
+.presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.preset { aspect-ratio: 1; border: 0; border-radius: 50%; font-size: 22px; cursor: pointer; display: grid; place-items: center; padding: 0; opacity: .85; transition: transform .1s; }
+.preset:hover { transform: scale(1.08); opacity: 1; }
+.preset.on { opacity: 1; box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--accent); }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 0; cursor: pointer; padding: 0; }
+.swatch.on { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--ink); }
+textarea.input { resize: vertical; min-height: 80px; line-height: 1.45; }
+.pcard { display: flex; gap: 14px; align-items: flex-start; text-align: left; min-width: 0; }
+.pcard-body { min-width: 0; flex: 1; }
+.pcard-lbl { font-size: 12px; font-weight: 700; color: var(--ink3); text-transform: uppercase; letter-spacing: .06em; }
+.pcard-name { font-weight: 800; font-size: 18px; overflow-wrap: anywhere; }
+.pcard-bio { color: var(--ink2); font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; white-space: pre-line; }
+.pcard-stats { font-size: 13px; color: var(--ink3); font-weight: 600; margin-top: 6px; }
+.pstats { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.pstats .stat { min-width: 0; padding: 10px; text-align: center; }
+.pstats .stat b { font-size: 20px; }
+.versus { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 18px 0; }
+.versus .pcard { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.vs { font-family: "Unbounded", sans-serif; font-weight: 800; color: var(--ink3); }
+.pwho { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.opp-btn { border: 0; background: none; padding: 0; cursor: pointer; text-align: right; font: inherit; color: inherit; }
+.opp-btn:hover .pname { color: var(--accent); }
+.modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: none; place-items: center; z-index: 60; padding: 16px; }
+.modal.show { display: grid; }
+.modal-box { width: 100%; max-width: 420px; }
+@media (max-width: 760px) {
+  .presets { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .preset { font-size: 18px; }
+  .pstats { grid-template-columns: repeat(2, 1fr); }
+  .versus { grid-template-columns: 1fr; }
+  .vs { text-align: center; }
+  nav.tabs button { font-size: 14px; padding: 7px 2px; }
+  .me-btn { margin-left: auto; }
+  .theme-btn { margin-left: 0; }
+}
+
 </style>
 </head>
 <body>
@@ -288,7 +329,9 @@ h3 { font-size: 15px; margin: 0 0 10px; }
       <button data-tab="duel">Дуэль</button>
       <button data-tab="solo">Соло</button>
       <button data-tab="rules">Правила</button>
+      <button data-tab="profile">Профиль</button>
     </nav>
+    <button class="me-btn" id="me-btn" title="Мой профиль" aria-label="Мой профиль"></button>
     <button class="theme-btn" id="theme" title="Светлая / тёмная тема" aria-label="Сменить тему">◐</button>
   </div>
 </header>
@@ -2502,6 +2545,159 @@ var Net = (function () {
 })();
 
 ;
+/* ===== Профиль игрока: аватар, описание, статистика =====
+   Профиль хранится в браузере (localStorage). В дуэли его «визитка»
+   (имя, аватар, описание и пара цифр статистики) передаётся сопернику. */
+var Profile = (function () {
+  const KEY = 'egeduel:profile';
+  const BIO_MAX = 160;
+  const PHOTO_MAX = 60000; // символов в data URL
+  const PRESETS = ['🦊', '🐼', '🐱', '🦉', '🐸', '🐧', '🐯', '🐨', '🚀', '⚡', '🔥', '🌟', '🎯', '🧠', '📐', '🎓'];
+  const COLORS = ['#4c6ef5', '#12b886', '#f76707', '#e64980', '#7950f2', '#15aabf', '#fab005', '#fa5252'];
+  const EMPTY_STATS = { duels: 0, wins: 0, losses: 0, draws: 0, solo: 0, bestSolo: 0, solved: 0 };
+
+  const esc = (s) => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const hash = (s) => { let h = 0; for (const ch of String(s || '')) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h; };
+
+  function load() {
+    let p = null;
+    try { p = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (!p || typeof p !== 'object') {
+      let name = '';
+      try { name = JSON.parse(localStorage.getItem('egeduel:name') || '""'); } catch (e) {}
+      p = { name: name || '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length) };
+    }
+    p.stats = Object.assign({}, EMPTY_STATS, p.stats || {});
+    return p;
+  }
+  let me = load();
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(me)); localStorage.setItem('egeduel:name', JSON.stringify(me.name)); return true; }
+    catch (e) { return false; }
+  }
+
+  // Визитка для соперника
+  function shared() {
+    return {
+      name: (me.name || '').trim().slice(0, 24) || 'Игрок',
+      bio: (me.bio || '').slice(0, BIO_MAX),
+      photo: me.photo || null,
+      preset: me.preset | 0,
+      color: me.color | 0,
+      stats: { duels: me.stats.duels, wins: me.stats.wins, bestSolo: me.stats.bestSolo },
+    };
+  }
+
+  // Проверка визитки, пришедшей по сети
+  function sanitize(p) {
+    if (!p || typeof p !== 'object') return null;
+    const photo = typeof p.photo === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p.photo) && p.photo.length <= PHOTO_MAX ? p.photo : null;
+    const st = p.stats && typeof p.stats === 'object' ? p.stats : {};
+    const int = (v) => Math.max(0, Math.min(1e6, Math.floor(+v || 0)));
+    return {
+      name: String(p.name || 'Соперник').slice(0, 24),
+      bio: String(p.bio || '').slice(0, BIO_MAX),
+      photo,
+      preset: Math.abs(p.preset | 0) % PRESETS.length,
+      color: Math.abs(p.color | 0) % COLORS.length,
+      stats: { duels: int(st.duels), wins: int(st.wins), bestSolo: int(st.bestSolo) },
+    };
+  }
+
+  // Профиль-заглушка по имени (если визитка ещё не пришла)
+  function fallback(name) {
+    const h = hash(name);
+    return { name: name || 'Соперник', bio: '', photo: null, preset: h % PRESETS.length, color: (h >> 4) % COLORS.length, stats: null };
+  }
+
+  function avatar(p, size = 40, cls = '') {
+    p = p || fallback('');
+    const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.55)}px`;
+    if (p.photo) return `<span class="ava ${cls}" style="${st}"><img src="${p.photo}" alt=""></span>`;
+    return `<span class="ava ${cls}" style="${st};background:${COLORS[(p.color | 0) % COLORS.length]}">${PRESETS[(p.preset | 0) % PRESETS.length]}</span>`;
+  }
+
+  const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+
+  function statLine(st) {
+    if (!st) return '';
+    const parts = [];
+    parts.push(`⚔️ ${st.duels} ${plural(st.duels, 'дуэль', 'дуэли', 'дуэлей')}`);
+    parts.push(`🏆 ${st.wins} ${plural(st.wins, 'победа', 'победы', 'побед')}`);
+    if (st.bestSolo) parts.push(`🎯 рекорд соло: ${st.bestSolo}`);
+    return parts.join(' · ');
+  }
+
+  function card(p, label) {
+    p = p || fallback('');
+    return `<div class="pcard">
+      ${avatar(p, 64)}
+      <div class="pcard-body">
+        ${label ? `<div class="pcard-lbl">${esc(label)}</div>` : ''}
+        <div class="pcard-name">${esc(p.name || 'Игрок')}</div>
+        ${p.bio ? `<div class="pcard-bio">${esc(p.bio)}</div>` : '<div class="pcard-bio muted">Без описания</div>'}
+        ${p.stats ? `<div class="pcard-stats">${statLine(p.stats)}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Загрузка фото: обрезка по центру до квадрата 128×128, JPEG
+  function readPhoto(file) {
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\//.test(file.type)) { reject(new Error('Это не изображение')); return; }
+      if (file.size > 15 * 1024 * 1024) { reject(new Error('Файл больше 15 МБ')); return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const S = 128;
+        const c = document.createElement('canvas');
+        c.width = S; c.height = S;
+        const ctx = c.getContext('2d');
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, S, S);
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, S, S);
+        URL.revokeObjectURL(url);
+        let q = 0.85, data = c.toDataURL('image/jpeg', q);
+        while (data.length > PHOTO_MAX && q > 0.3) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+        if (data.length > PHOTO_MAX) { reject(new Error('Не удалось сжать фото')); return; }
+        resolve(data);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Не удалось открыть изображение')); };
+      img.src = url;
+    });
+  }
+
+  // Запись результата игры в статистику (один раз на игру)
+  function record(key, result) {
+    let done = [];
+    try { done = JSON.parse(sessionStorage.getItem('egeduel:recorded') || '[]'); } catch (e) {}
+    if (done.indexOf(key) >= 0) return false;
+    done.push(key);
+    try { sessionStorage.setItem('egeduel:recorded', JSON.stringify(done.slice(-50))); } catch (e) {}
+    const st = me.stats;
+    st.solved += result.solved || 0;
+    if (result.mode === 'solo') { st.solo++; st.bestSolo = Math.max(st.bestSolo, result.solved || 0); }
+    else {
+      st.duels++;
+      if (result.outcome === 'win') st.wins++;
+      else if (result.outcome === 'loss') st.losses++;
+      else st.draws++;
+    }
+    save();
+    return true;
+  }
+
+  function resetStats() { me.stats = Object.assign({}, EMPTY_STATS); save(); }
+
+  return {
+    get me() { return me; }, save, shared, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
+    PRESETS, COLORS, BIO_MAX, esc,
+  };
+})();
+
+;
 /* ===== Приложение: интерфейс, соло, дуэль ===== */
 (function () {
   const E = EGE;
@@ -2525,7 +2721,7 @@ var Net = (function () {
   const app = {
     tab: 'duel',
     draft: { duel: Object.assign({}, DEFAULTS, store.get('egeduel:set:duel', {})), solo: Object.assign({}, DEFAULTS, store.get('egeduel:set:solo', {})) },
-    name: store.get('egeduel:name', ''),
+    name: Profile.me.name || store.get('egeduel:name', ''),
     game: null,
     joinCode: '',
     joinError: '',
@@ -2576,7 +2772,7 @@ var Net = (function () {
      ====================================================================== */
   function newState(settings, hostName, code) {
     return {
-      v: 1, seq: 0, code: code || null, settings: Object.assign({}, settings),
+      v: 1, seq: 0, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), gameNo: 1, code: code || null, settings: Object.assign({}, settings),
       phase: code ? 'lobby' : 'ready', round: 0,
       players: { host: { name: hostName, lives: settings.lives, answered: false, ready: false }, guest: null },
       task: null, deadline: 0, result: null, history: [], winner: null, reason: null,
@@ -2654,7 +2850,7 @@ var Net = (function () {
       if (roles(S).every((r) => S.players[r].ready)) {
         E.resetMemory();
         roles(S).forEach((r) => { S.players[r].lives = S.settings.lives; });
-        S.history = []; S.round = 0; S.winner = null; S.reason = null;
+        S.history = []; S.round = 0; S.winner = null; S.reason = null; S.gameNo = (S.gameNo || 1) + 1;
         startRound(S, P);
       }
     }
@@ -2728,6 +2924,9 @@ var Net = (function () {
     const g = app.game;
     link.on('g2h', (m) => onGuestMsg(m));
     link.on('presence/guest', (v) => { g.oppOnline = v === '1'; render(); });
+    // визитка гостя (хозяин сам её публикует; после перезагрузки страницы берём сохранённую)
+    link.on('profile/guest', (p) => { if (p && typeof p === 'object' && !g.oppProfile) { g.oppProfile = Profile.sanitize(p); render(); } });
+    link.send('profile/host', Profile.shared(), { retain: true });
   }
 
   function onGuestMsg(m) {
@@ -2736,6 +2935,12 @@ var Net = (function () {
     const S = g.S, P = g.P;
     if (m.type === 'ping') { g.link.send('h2g', { type: 'pong', t: m.t, h: Date.now(), pid: m.pid }, { qos: 0 }); return; }
     if (m.type === 'join') {
+      const acceptProfile = () => {
+        const p = Profile.sanitize(m.profile) || Profile.fallback(String(m.name || 'Соперник'));
+        g.oppProfile = p;
+        g.link.send('profile/guest', p, { retain: true });
+      };
+      if ((!S.players.guest && S.phase === 'lobby') || (S.players.guest && S.players.guest.pid === m.pid)) acceptProfile();
       if (!S.players.guest && S.phase === 'lobby') {
         S.players.guest = { pid: m.pid, name: String(m.name || 'Соперник').slice(0, 24), lives: S.settings.lives, answered: false, ready: false };
         S.phase = 'ready';
@@ -2785,7 +2990,8 @@ var Net = (function () {
       }
     });
     link.on('presence/host', (v) => { g.oppOnline = v === '1'; render(); });
-    const sendJoin = () => link.send('g2h', { type: 'join', pid, name: app.name.trim().slice(0, 24) });
+    link.on('profile/host', (p) => { if (p && typeof p === 'object') { g.oppProfile = Profile.sanitize(p); render(); } });
+    const sendJoin = () => link.send('g2h', { type: 'join', pid, name: app.name.trim().slice(0, 24), profile: Profile.shared() });
     sendJoin();
     let n = 0;
     g.joinTimer = setInterval(() => {
@@ -2883,7 +3089,7 @@ var Net = (function () {
     }
     clearInterval(g.joinTimer); clearTimeout(g.pingTimer);
     if (g.mode === 'host') {
-      if (S.phase === 'lobby' || S.phase === 'over') { g.link.clear('state'); }
+      if (S.phase === 'lobby' || S.phase === 'over') { g.link.clear('state'); g.link.clear('profile/host'); g.link.clear('profile/guest'); }
       else { S.phase = 'over'; S.winner = 'guest'; S.reason = 'leave'; S.seq++; S.now = Date.now(); g.link.send('state', S, { retain: true }); }
       store.del('egeduel:host:' + S.code);
       g.link.close();
@@ -2908,7 +3114,7 @@ var Net = (function () {
     if (el) el.classList.toggle('show', !ok && !!app.game && app.game.mode !== 'solo');
     if (ok && app.game && app.game.mode === 'host') setTimeout(() => commit(), 100);
     if (ok && app.game && app.game.mode === 'guest' && app.game.link) {
-      app.game.link.send('g2h', { type: 'join', pid: app.game.pid, name: app.name.trim().slice(0, 24) });
+      app.game.link.send('g2h', { type: 'join', pid: app.game.pid, name: app.name.trim().slice(0, 24), profile: Profile.shared() });
     }
   }
 
@@ -2991,13 +3197,137 @@ var Net = (function () {
 
   function render() {
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === app.tab));
+    renderHeaderAvatar();
     const g = app.game;
+    if (g && g.S && g.S.phase === 'over') recordResult(g);
     const gameTab = g ? (g.mode === 'solo' ? 'solo' : 'duel') : null;
     if (g && app.tab === gameTab) { renderGame(); return; }
     app.rendered = null;
+    if (app.tab === 'profile') { if (!$('#profile-page')) renderProfile(); return; }
     if (app.tab === 'duel') renderDuelHome();
     else if (app.tab === 'solo') renderSoloHome();
     else renderRules();
+  }
+
+  /* ---------- профиль ---------- */
+  function setName(v) {
+    app.name = v;
+    Profile.me.name = String(v).slice(0, 24);
+    Profile.save();
+    $$('[data-name]').forEach((inp) => { if (inp !== document.activeElement) inp.value = v; });
+    renderHeaderAvatar();
+    updateProfilePreview();
+  }
+
+  function renderHeaderAvatar() {
+    const b = $('#me-btn');
+    if (b) b.innerHTML = Profile.avatar(Profile.shared(), 34);
+  }
+
+  // Соперник: его визитка или заглушка по имени
+  function oppProfile(S, role) {
+    const g = app.game;
+    const p = S.players[role];
+    if (!p) return null;
+    if (role === myRole()) return Profile.shared();
+    return g.oppProfile || Profile.fallback(p.name);
+  }
+
+  function recordResult(g) {
+    const S = g.S;
+    if (!S.history.length && S.reason !== 'leave') return;
+    const me = myRole();
+    const key = (S.code || 'solo') + ':' + (S.id || '') + ':' + (S.gameNo || 1) + ':' + me;
+    const solved = S.history.filter((h) => h[me]).length;
+    if (isSolo(S)) Profile.record(key, { mode: 'solo', solved });
+    else Profile.record(key, { mode: 'duel', solved, outcome: S.winner === 'draw' ? 'draw' : S.winner === me ? 'win' : 'loss' });
+  }
+
+  function renderProfile() {
+    const p = Profile.me;
+    const st = p.stats;
+    const presets = Profile.PRESETS.map((e, i) => `<button type="button" class="preset ${!p.photo && p.preset === i ? 'on' : ''}" data-preset="${i}" style="background:${Profile.COLORS[p.color % Profile.COLORS.length]}" aria-label="Аватар ${e}">${e}</button>`).join('');
+    const colors = Profile.COLORS.map((c, i) => `<button type="button" class="swatch ${p.color === i ? 'on' : ''}" data-color="${i}" style="background:${c}" aria-label="Цвет фона"></button>`).join('');
+    main().innerHTML = `
+      <div id="profile-page">
+      <h1>Мой профиль</h1>
+      <p class="lead">Так вас увидит соперник в дуэли: аватар, имя и пара слов о себе. Профиль хранится в этом браузере — регистрация не нужна.</p>
+      <div class="grid2">
+        <section class="card">
+          <h2>Аватар</h2>
+          <div class="row" style="gap:16px;align-items:center;margin-bottom:16px">
+            <div id="ava-big">${Profile.avatar(Profile.shared(), 96)}</div>
+            <div class="stack" style="flex:1">
+              <div class="row">
+                <label class="btn soft" for="photo-in" style="cursor:pointer">📷 Загрузить фото</label>
+                <input type="file" id="photo-in" accept="image/*" class="hide">
+                ${p.photo ? '<button type="button" class="btn ghost" id="photo-del">Убрать фото</button>' : ''}
+              </div>
+              <div class="hint" style="margin-top:6px">Фото обрежется по центру до квадрата и уменьшится.</div>
+            </div>
+          </div>
+          <span class="lbl">Или выберите картинку</span>
+          <div class="presets">${presets}</div>
+          <span class="lbl" style="margin-top:14px">Цвет фона</span>
+          <div class="row" style="gap:8px">${colors}</div>
+          <h2 style="margin-top:26px">О себе</h2>
+          <div class="field"><label for="p-name">Имя</label><input class="input" id="p-name" maxlength="24" placeholder="Например, Аня" value="${esc(p.name)}" data-name></div>
+          <div class="field"><label for="p-bio">Описание</label>
+            <textarea class="input" id="p-bio" rows="3" maxlength="${Profile.BIO_MAX}" placeholder="Например: 11 класс, целюсь на 90+, люблю параметры">${esc(p.bio)}</textarea>
+            <div class="hint"><span id="bio-count">${p.bio.length}</span>/${Profile.BIO_MAX} · сохраняется автоматически</div>
+          </div>
+        </section>
+        <div class="stack">
+          <section class="card">
+            <h3>Так вас видит соперник</h3>
+            <div id="p-preview">${Profile.card(Profile.shared())}</div>
+          </section>
+          <section class="card">
+            <h3>Статистика</h3>
+            <div class="pstats">
+              <div class="stat"><b>${st.duels}</b><span>дуэлей</span></div>
+              <div class="stat"><b>${st.wins}</b><span>побед</span></div>
+              <div class="stat"><b>${st.losses}</b><span>поражений</span></div>
+              <div class="stat"><b>${st.draws}</b><span>ничьих</span></div>
+              <div class="stat"><b>${st.solo}</b><span>соло-игр</span></div>
+              <div class="stat"><b>${st.bestSolo}</b><span>рекорд соло</span></div>
+              <div class="stat"><b>${st.solved}</b><span>задач решено</span></div>
+              <div class="stat"><b>${st.duels ? Math.round((st.wins / st.duels) * 100) : 0}%</b><span>побед в дуэлях</span></div>
+            </div>
+            <div class="actions"><button type="button" class="link" id="stats-reset" style="color:var(--bad)">Сбросить статистику</button></div>
+          </section>
+        </div>
+      </div>
+      </div>`;
+    bindCommon();
+    const bio = $('#p-bio');
+    bio.addEventListener('input', () => {
+      Profile.me.bio = bio.value.slice(0, Profile.BIO_MAX);
+      Profile.save();
+      $('#bio-count').textContent = Profile.me.bio.length;
+      updateProfilePreview();
+    });
+    $$('[data-preset]').forEach((b) => (b.onclick = () => { Profile.me.preset = +b.dataset.preset; Profile.me.photo = null; Profile.save(); renderProfile(); renderHeaderAvatar(); }));
+    $$('[data-color]').forEach((b) => (b.onclick = () => { Profile.me.color = +b.dataset.color; Profile.save(); renderProfile(); renderHeaderAvatar(); }));
+    $('#photo-in').onchange = async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try {
+        Profile.me.photo = await Profile.readPhoto(f);
+        if (!Profile.save()) { Profile.me.photo = null; toast('Не удалось сохранить фото в браузере'); }
+        else toast('Фото обновлено');
+      } catch (err) { toast(err.message || 'Не удалось загрузить фото'); }
+      renderProfile(); renderHeaderAvatar();
+    };
+    if ($('#photo-del')) $('#photo-del').onclick = () => { Profile.me.photo = null; Profile.save(); renderProfile(); renderHeaderAvatar(); };
+    $('#stats-reset').onclick = () => { if (confirm('Сбросить всю статистику?')) { Profile.resetStats(); renderProfile(); } };
+  }
+
+  function updateProfilePreview() {
+    const pv = $('#p-preview');
+    if (pv) pv.innerHTML = Profile.card(Profile.shared());
+    const big = $('#ava-big');
+    if (big) big.innerHTML = Profile.avatar(Profile.shared(), 96);
   }
 
   function activeGameBanner(tab) {
@@ -3123,7 +3453,7 @@ var Net = (function () {
   }
 
   function bindCommon() {
-    $$('[data-name]').forEach((inp) => inp.addEventListener('input', (e) => { app.name = e.target.value; store.set('egeduel:name', app.name); }));
+    $$('[data-name]').forEach((inp) => inp.addEventListener('input', (e) => { setName(e.target.value); }));
     $$('[data-go]').forEach((b) => (b.onclick = () => { app.tab = b.dataset.go; render(); }));
     $$('section.card').forEach((card) => {
       card.addEventListener('click', (e) => {
@@ -3239,10 +3569,12 @@ var Net = (function () {
     } else center = `<div class="round-lbl">${S.phase === 'ready' ? 'Подготовка' : S.phase === 'over' ? 'Игра окончена' : 'Раунд ' + S.round}</div>`;
     hud.className = 'hud';
     hud.innerHTML = `
-      <div class="player"><div class="pname">${esc(meP.name)} <span class="muted" style="font-weight:600">(вы)</span></div>${hearts(meP.lives, max)}${statusOf(me, meP)}</div>
+      <div class="player"><div class="pwho">${Profile.avatar(Profile.shared(), 34)}<div class="pname">${esc(meP.name)} <span class="muted" style="font-weight:600">(вы)</span></div></div>${hearts(meP.lives, max)}${statusOf(me, meP)}</div>
       <div class="center-hud">${center}</div>
       ${solo ? `<div class="player right"><div class="pname">Соло</div><div class="pstat">Решено: ${S.history.filter((h) => h.host).length} из ${S.history.length}</div></div>`
-        : oppP ? `<div class="player right"><div class="pname">${esc(oppP.name)}</div>${hearts(oppP.lives, max)}${statusOf(opp, oppP)}</div>` : '<div></div>'}`;
+        : oppP ? `<div class="player right"><button type="button" class="pwho opp-btn" id="opp-btn" title="Профиль соперника"><div class="pname">${esc(oppP.name)}</div>${Profile.avatar(oppProfile(S, opp), 34)}</button>${hearts(oppP.lives, max)}${statusOf(opp, oppP)}</div>` : '<div></div>'}`;
+    const ob = $('#opp-btn');
+    if (ob) ob.onclick = () => showOppCard(S, opp);
     const tb = $('#tbar');
     if (tb) {
       if (S.phase === 'question' && S.deadline) {
@@ -3252,6 +3584,16 @@ var Net = (function () {
         tb.innerHTML = `<i style="width:${pct}%"></i>`;
       } else { tb.className = ''; tb.innerHTML = ''; }
     }
+  }
+
+  function showOppCard(S, role) {
+    let m = $('#modal');
+    if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal-box card">${Profile.card(oppProfile(S, role), 'Соперник')}<div class="actions" style="justify-content:flex-end"><button class="btn ghost" id="modal-close">Закрыть</button></div></div>`;
+    m.classList.add('show');
+    const close = () => m.classList.remove('show');
+    $('#modal-close').onclick = close;
+    m.onclick = (e) => { if (e.target === m) close(); };
   }
 
   function taskCard(S) {
@@ -3361,7 +3703,8 @@ var Net = (function () {
       const pend = meP.ready || g.ui.pendingReady;
       body.innerHTML = `<section class="card" style="text-align:center;padding:32px">
         <h2>${oppP ? 'Соперник найден!' : 'Ожидание'}</h2>
-        <p class="muted">${esc(S.players.host.name)} vs ${esc(S.players.guest ? S.players.guest.name : '…')} · ${timeLabel(S.settings.time)} на ответ · ${S.settings.lives} ${livesWord(S.settings.lives)} · ${esc(numsLabel(S.settings))}</p>
+        <div class="versus">${Profile.card(Profile.shared(), 'Вы')}<div class="vs">VS</div>${oppP ? Profile.card(oppProfile(S, myRole() === 'host' ? 'guest' : 'host'), 'Соперник') : ''}</div>
+        <p class="muted">${timeLabel(S.settings.time)} на ответ · ${S.settings.lives} ${livesWord(S.settings.lives)} · ${esc(numsLabel(S.settings))}</p>
         <div class="actions" style="justify-content:center" id="readybox">${pend ? '<div class="waiting"><span class="dot-pulse"></span> Ждём, когда соперник нажмёт «Начать»…</div>' : '<button class="btn big" id="next">Начать дуэль</button>'}</div>
         <div class="actions" style="justify-content:center"><button class="btn danger" id="leave">Выйти</button></div>
       </section>`;
@@ -3489,6 +3832,7 @@ var Net = (function () {
   function init() {
     $$('nav.tabs button').forEach((b) => (b.onclick = () => { app.tab = b.dataset.tab; app.joinError = ''; render(); window.scrollTo(0, 0); }));
     $('.logo').onclick = () => { app.tab = 'duel'; render(); };
+    $('#me-btn').onclick = () => { app.tab = 'profile'; render(); window.scrollTo(0, 0); };
     const tb = $('#theme');
     const applyTheme = (t) => { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); };
     applyTheme(store.get('egeduel:theme', null));
