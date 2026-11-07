@@ -406,6 +406,13 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
   .me-btn { width: 34px; height: 34px; }
 }
 
+/* профиль на всю ширину: слева профиль, в центре аккаунт и статистика, справа огонёк */
+.wrap:has(> #profile-page), #main:has(#profile-page) { max-width: 1440px; }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.profile-side { position: sticky; top: 84px; }
+@media (max-width: 1180px) { .profile-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } .profile-side { position: static; grid-column: 2; grid-row: 1; } .profile-grid > .stack:not(.profile-side) { grid-column: 2; } .profile-grid > section.card { grid-row: 1 / span 2; } }
+@media (max-width: 760px) { .profile-grid { grid-template-columns: 1fr; } .profile-grid > *, .profile-side, .profile-grid > section.card { grid-column: auto !important; grid-row: auto !important; } }
+
 </style>
 </head>
 <body>
@@ -3715,7 +3722,7 @@ var Cloud = (function () {
       <div id="profile-page">
       <h1>Мой профиль</h1>
       <p class="lead">Так вас увидит соперник в дуэли: аватар, имя и пара слов о себе. ${Cloud.user ? "Профиль сохраняется в вашем Google-аккаунте." : "Без входа профиль хранится только в этом браузере. Войдите через Google, чтобы он сохранялся в аккаунте."}</p>
-      <div class="grid2">
+      <div class="profile-grid">
         <section class="card">
           <h2>Аватар</h2>
           <div class="row" style="gap:16px;align-items:center;margin-bottom:16px">
@@ -3741,7 +3748,6 @@ var Cloud = (function () {
           </div>
         </section>
         <div class="stack">
-          <section class="card" id="streak-card">${streakCardHTML()}</section>
           ${Cloud.available ? `<section class="card" id="acc-card">${accountHTML()}</section>` : ''}
           <section class="card">
             <h3>Так вас видит соперник</h3>
@@ -3761,6 +3767,9 @@ var Cloud = (function () {
             </div>
             <div class="actions"><button type="button" class="link" id="stats-reset" style="color:var(--bad)">Сбросить статистику</button></div>
           </section>
+        </div>
+        <div class="stack profile-side">
+          <section class="card" id="streak-card">${streakCardHTML()}</section>
         </div>
       </div>
       </div>`;
