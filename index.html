@@ -3214,15 +3214,57 @@ var SubjectIcons = (function () {
     `<path d="M24.5 8 H39.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>`,
     'sic-chem');
 
-  // Биология: двойная спираль ДНК плавно вращается
-  let rungs = '';
-  for (let i = 0; i < 7; i++) {
-    const y = 9 + i * 7.6;
-    rungs += `<g transform="translate(32 ${y})"><g class="dna-r" style="animation-delay:${(-i * 0.36).toFixed(2)}s">` +
-      `<line x1="-13" y1="0" x2="13" y2="0" stroke="currentColor" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/>` +
-      `<circle cx="-13" cy="0" r="3.4" fill="#4dabf7"/><circle cx="13" cy="0" r="3.4" fill="#f06595"/></g></g>`;
+  // Биология: диагональная спираль ДНК вращается в объёме.
+  // Каждая перемычка — синяя линия с шариками на концах; «ближний» шарик крупнее,
+  // «дальний» мельче и рисуется позади линии. Кадры считает DNA.frame (см. ниже).
+  const DNA_N = 10, DNA_STEP = 5.6, DNA_R = 12;
+  const DNA_COLORS = [['#ffa400', '#5f7f8f'], ['#66d0f7', '#e3e6ea']];
+  function dnaRung(i, t) {
+    const th = t * 1.7 + i * 0.6;
+    const c = Math.cos(th), s = Math.sin(th);
+    const y = 32 - ((DNA_N - 1) * DNA_STEP) / 2 + i * DNA_STEP;
+    const [colA, colB] = DNA_COLORS[Math.floor(i / 2) % 2];
+    const a = { x: 32 + DNA_R * c, z: s, col: colA }, b = { x: 32 - DNA_R * c, z: -s, col: colB };
+    const back = a.z < b.z ? a : b, front = back === a ? b : a;
+    const r = (z) => (2.7 * (1 + 0.32 * z)).toFixed(2);
+    return { y, x1: a.x.toFixed(2), x2: b.x.toFixed(2), back, front, rb: r(back.z), rf: r(front.z) };
   }
-  const bio = svg(rungs, 'sic-bio');
+  let rungs = '';
+  for (let i = 0; i < DNA_N; i++) {
+    const d = dnaRung(i, 0);
+    rungs += `<g class="dna-rung">` +
+      `<circle class="db" cx="${d.back.x.toFixed(2)}" cy="${d.y}" r="${d.rb}" fill="${d.back.col}" fill-opacity=".8"/>` +
+      `<line x1="${d.x1}" y1="${d.y}" x2="${d.x2}" y2="${d.y}" stroke="#1c9ad6" stroke-width="2.6" stroke-linecap="round"/>` +
+      `<circle class="df" cx="${d.front.x.toFixed(2)}" cy="${d.y}" r="${d.rf}" fill="${d.front.col}"/></g>`;
+  }
+  const bio = svg(`<g transform="rotate(-42 32 32)">${rungs}</g>`, 'sic-bio');
+
+  // Анимация спирали: один общий цикл для всех иконок ДНК на странице (только когда они есть на экране)
+  const DNA = {
+    frame(el, t) {
+      el.querySelectorAll('.dna-rung').forEach((g, i) => {
+        const d = dnaRung(i, t);
+        const db = g.children[0], ln = g.children[1], df = g.children[2];
+        db.setAttribute('cx', d.back.x.toFixed(2)); db.setAttribute('r', d.rb); db.setAttribute('fill', d.back.col);
+        ln.setAttribute('x1', d.x1); ln.setAttribute('x2', d.x2);
+        df.setAttribute('cx', d.front.x.toFixed(2)); df.setAttribute('r', d.rf); df.setAttribute('fill', d.front.col);
+      });
+    },
+    started: false,
+    start() {
+      if (DNA.started || typeof window === 'undefined') return;
+      DNA.started = true;
+      if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const t0 = performance.now();
+      const tick = (now) => {
+        const t = (now - t0) / 1000;
+        document.querySelectorAll('svg.sic-bio').forEach((el) => DNA.frame(el, t));
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+  };
+  if (typeof window !== 'undefined') window.addEventListener('load', DNA.start);
 
   // Русский: книжка плавно открывается и закрывается
   const lines = (x1, x2) => [21, 26, 31, 36, 41].map((y) => `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#adb5bd" stroke-width="1.6" stroke-linecap="round"/>`).join('');
@@ -3269,7 +3311,7 @@ var SubjectIcons = (function () {
     ticks,
     'sic-math');
 
-  return { chem, bio, rus, soc, phys, math };
+  return { chem, bio, rus, soc, phys, math, DNA };
 })();
 
 ;
