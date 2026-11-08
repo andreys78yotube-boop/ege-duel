@@ -478,6 +478,11 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 @media (max-width: 760px) { .subjects { grid-template-columns: 1fr 1fr; } .subject:last-child:nth-child(odd) { grid-column: span 2; } }
 @media (max-width: 340px) { .subjects { grid-template-columns: 1fr !important; } .subject:last-child:nth-child(odd) { grid-column: auto; } }
 @media (max-width: 760px) { .subject-name { font-size: 14px; } }
+/* шесть предметов: 3 + 3 на компьютере, по два на телефоне */
+.subjects { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.subject { min-height: 130px; }
+@media (max-width: 760px) { .subjects { grid-template-columns: 1fr 1fr !important; } }
+@media (max-width: 340px) { .subjects { grid-template-columns: 1fr !important; } }
 
 </style>
 </head>
@@ -4019,6 +4024,7 @@ var Cloud = (function () {
     { id: 'chem', name: 'Химия', icon: '🧪', color: '#12b886', note: 'Реакции, расчёты, органика' },
     { id: 'rus', name: 'Русский язык', icon: '📖', color: '#4c6ef5', note: 'Орфография, пунктуация, сочинение' },
     { id: 'soc', name: 'Общество­знание', icon: '🏛️', color: '#f59f00', note: 'Право, экономика, политика' },
+    { id: 'bio', name: 'Биология', icon: '🧬', color: '#40c057', note: 'Клетка, генетика, эволюция' },
     { id: 'phys', name: 'Физика', icon: '⚛️', color: '#e64980', note: 'Механика, электричество, оптика' },
     { id: 'math', name: 'Профильная математика', icon: '📐', color: '#7950f2', note: 'Все 19 заданий ЕГЭ · дуэли и соло' },
   ];
