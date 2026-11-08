@@ -507,6 +507,10 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 .flame.off .fl-outer, .flame.off .fl-inner { animation: none; }
 @media (prefers-reduced-motion: reduce) { .flame.lit .fl-outer, .flame.lit .fl-inner { animation: none; } }
 
+/* на главной меню раздела скрыто: сначала выбирают предмет */
+nav.tabs.nav-hidden { display: none !important; }
+body.on-home .login-btn:not(.hide), body.on-home .login-btn.hide + .streak-btn { margin-left: auto; }
+
 </style>
 </head>
 <body>
@@ -3645,6 +3649,11 @@ var Cloud = (function () {
 
   function render() {
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === app.tab));
+    // меню раздела (Дуэль / Соло / Правила) появляется только после выбора предмета
+    const navEl = $('nav.tabs');
+    const sectionNav = !(app.tab === 'home' || app.tab === 'soon');
+    if (navEl) navEl.classList.toggle('nav-hidden', !sectionNav);
+    document.body.classList.toggle('on-home', !sectionNav);
     movePill();
     renderHeaderAvatar();
     const g = app.game;
