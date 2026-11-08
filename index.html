@@ -484,6 +484,29 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 @media (max-width: 760px) { .subjects { grid-template-columns: 1fr 1fr !important; } }
 @media (max-width: 340px) { .subjects { grid-template-columns: 1fr !important; } }
 
+/* ---------- новый огонёк: живое пламя ---------- */
+.streak-btn.on .flame, .streak-big.on .flame { animation: none !important; transform: none; }
+.flame .fl-outer, .flame .fl-inner { transform-box: fill-box; transform-origin: 50% 100%; }
+.flame.lit .fl-outer { animation: flameOuter 3.2s ease-in-out infinite; }
+.flame.lit .fl-inner { animation: flameInner 2.3s ease-in-out infinite; animation-delay: -.7s; }
+.flame.lit { filter: drop-shadow(0 0 4px rgba(255, 120, 30, .35)); }
+@keyframes flameOuter {
+  0%, 100% { transform: skewX(0deg) scale(1, 1); }
+  20% { transform: skewX(-5deg) scale(1.02, 1.03); }
+  40% { transform: skewX(-2deg) scale(.99, .98); }
+  60% { transform: skewX(4deg) scale(1.01, 1.04); }
+  80% { transform: skewX(2deg) scale(1, .99); }
+}
+@keyframes flameInner {
+  0%, 100% { transform: skewX(0deg) scale(1, 1); }
+  25% { transform: skewX(6deg) scale(.97, 1.05); }
+  50% { transform: skewX(-2deg) scale(1.02, .97); }
+  75% { transform: skewX(-6deg) scale(.98, 1.04); }
+}
+.flame.off { filter: grayscale(1) brightness(.9); opacity: .45; }
+.flame.off .fl-outer, .flame.off .fl-inner { animation: none; }
+@media (prefers-reduced-motion: reduce) { .flame.lit .fl-outer, .flame.lit .fl-inner { animation: none; } }
+
 </style>
 </head>
 <body>
@@ -3681,10 +3704,20 @@ var Cloud = (function () {
   }
 
   /* ---------- огонёк ---------- */
-  const FLAME_PATH = 'M12 1.8c.9 3.3-1.4 5-1.4 7.4 0 1.2.8 2 1.8 2 1.3 0 2.1-1.1 1.7-2.9 2.4 1.6 4.2 4.3 4.2 7.3 0 3.7-2.8 6.6-6.3 6.6S5.7 19.3 5.7 15.7c0-2.5 1.2-4.4 2.6-5.9 1.6-1.7 3.3-4 3.7-8z';
-  const FLAME_CORE = 'M12 13.4c.4 1.6-.8 2.3-.8 3.4 0 .8.6 1.3 1.2 1.3 1 0 1.6-.9 1.6-2 0-1-.6-1.9-2-2.7z';
+  // Пламя: внешний язык (красно-оранжевый) с боковым язычком и внутреннее жёлтое ядро
+  const FLAME_OUTER = 'M35 2C36.5 11 44 16.5 49.5 24.5C55 32.5 56 43 51.5 51C47.5 58 40.5 62 32 62C22.5 62 14.5 57 11.5 48.5C8.8 40.5 10.8 31.5 16.5 25C17 30.5 19 34 22.5 36.5C21.2 28.5 23.5 20.5 28 14.5C31 10.5 34 7 35 2Z';
+  const FLAME_INNER = 'M34 29C35.5 35.5 41.5 39.5 43 46.5C44.5 54 39.5 60 32.5 60C25.5 60 20.5 55.5 20.8 49C21 44 24 40.5 27 37.5C27.3 41.5 28.6 43.8 31 45.2C30 39.5 31 34 34 29Z';
   function flame(cls, size) {
-    return `<svg class="flame ${cls || ''}" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true"><defs><linearGradient id="fl-g" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff3d00"/><stop offset=".6" stop-color="#ff8a00"/><stop offset="1" stop-color="#ffd000"/></linearGradient></defs><path class="fl-body" d="${FLAME_PATH}"/><path class="fl-core" d="${FLAME_CORE}"/></svg>`;
+    const lit = !cls || cls === 'lit';
+    return `<svg class="flame ${lit ? 'lit' : cls}" viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">` +
+      `<defs>` +
+      `<linearGradient id="fl-out" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f03e3e"/><stop offset=".45" stop-color="#ff6b1a"/><stop offset="1" stop-color="#ffa63d"/></linearGradient>` +
+      `<radialGradient id="fl-glow" cx=".5" cy=".85" r=".6"><stop offset="0" stop-color="#ffd166" stop-opacity=".9"/><stop offset="1" stop-color="#ffd166" stop-opacity="0"/></radialGradient>` +
+      `<linearGradient id="fl-in" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffc93c"/><stop offset=".55" stop-color="#ffe680"/><stop offset="1" stop-color="#fff8d6"/></linearGradient>` +
+      `</defs>` +
+      `<g class="fl-outer"><path d="${FLAME_OUTER}" fill="url(#fl-out)"/><path d="${FLAME_OUTER}" fill="url(#fl-glow)"/></g>` +
+      `<g class="fl-inner"><path d="${FLAME_INNER}" fill="url(#fl-in)"/></g>` +
+      `</svg>`;
   }
   const daysWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'день' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'дня' : 'дней');
   function streakText(s) {
