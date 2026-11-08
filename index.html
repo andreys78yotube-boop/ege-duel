@@ -3332,7 +3332,7 @@ var SubjectIcons = (function () {
   const GRACE = 1800; // мс запаса на задержку сети для ответа соперника
   const ALL = Array.from({ length: 19 }, (_, i) => i + 1);
   const TIME_OPTS = [0, 60, 120, 180, 300, 600, 900, 1200];
-  const DEFAULTS = { time: 180, lives: 3, mode: 'all', nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], order: 'random' };
+  const DEFAULTS = { time: 180, lives: 3, rounds: 0, mode: 'all', nums: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], order: 'random' };
   const HEART = '<svg viewBox="0 0 24 24" class="heart" aria-hidden="true"><path fill="currentColor" d="M12 21.2s-7.6-4.7-9.7-9.5C.8 8.2 3 4.4 6.7 4.4c2.1 0 3.6 1.1 4.5 2.6.9-1.5 2.4-2.6 4.5-2.6 3.7 0 5.9 3.8 4.4 7.3-2.1 4.8-8.1 9.5-8.1 9.5z"/></svg>';
 
   const app = {
@@ -3453,8 +3453,22 @@ var SubjectIcons = (function () {
       if (!alive.length) { S.phase = 'over'; S.reason = 'lives'; } else S.phase = 'result';
     } else if (alive.length < 2) {
       S.phase = 'over'; S.reason = 'lives'; S.winner = alive.length ? alive[0] : 'draw';
+    } else if (S.settings.rounds && S.round >= S.settings.rounds) {
+      // все раунды сыграны: побеждает тот, у кого больше жизней, затем — больше верных ответов
+      S.phase = 'over'; S.reason = 'rounds'; S.winner = roundsWinner(S);
     } else S.phase = 'result';
   }
+
+  function roundsWinner(S) {
+    const H = S.players.host, G = S.players.guest;
+    if (H.lives !== G.lives) return H.lives > G.lives ? 'host' : 'guest';
+    const ok = (r) => S.history.filter((h) => h[r]).length;
+    const a = ok('host'), b = ok('guest');
+    if (a !== b) return a > b ? 'host' : 'guest';
+    return 'draw';
+  }
+  const roundsWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'раунд' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'раунда' : 'раундов');
+  const roundsLabel = (r) => (r ? r + ' ' + roundsWord(r) : 'без ограничения (до конца жизней)');
 
   function setReady(S, P, role) {
     if (!S.players[role]) return;
@@ -3764,7 +3778,7 @@ var SubjectIcons = (function () {
 
   /* ---------- настройки ---------- */
   function validSettings(d) {
-    const st = { time: Math.max(0, Math.min(3600, Math.round(+d.time || 0))), lives: Math.max(1, Math.min(10, Math.round(+d.lives || 3))), mode: d.mode === 'pick' ? 'pick' : 'all', nums: (d.nums || []).filter((x) => x >= 1 && x <= 19), order: d.order === 'seq' ? 'seq' : 'random' };
+    const st = { time: Math.max(0, Math.min(3600, Math.round(+d.time || 0))), lives: Math.max(1, Math.min(10, Math.round(+d.lives || 3))), rounds: Math.max(0, Math.min(100, Math.round(+d.rounds || 0))), mode: d.mode === 'pick' ? 'pick' : 'all', nums: (d.nums || []).filter((x) => x >= 1 && x <= 19), order: d.order === 'seq' ? 'seq' : 'random' };
     if (st.mode === 'pick' && !st.nums.length) { toast('Выберите хотя бы один номер задания'); return null; }
     return st;
   }
@@ -3779,6 +3793,16 @@ var SubjectIcons = (function () {
     s += `<div class="row ${custom ? '' : 'hide'}" style="margin-top:8px"><input class="input" style="max-width:110px" type="number" min="1" max="60" data-set="time-min" value="${custom ? Math.round(d.time / 60) || 1 : 5}"> <span class="muted">минут</span></div>`;
     s += `<div class="hint">Если игрок не успел ответить, он теряет жизнь. Для заданий 13–19 обычно нужно 10–20 минут.</div></div>`;
     s += `<div class="field"><span class="lbl">Количество жизней</span><div class="stepper"><button type="button" data-set="lives-" aria-label="Меньше">−</button><span>${d.lives} ${livesWord(d.lives)}</span><button type="button" data-set="lives+" aria-label="Больше">+</button></div></div>`;
+    if (key === 'duel') {
+      const R = +d.rounds || 0;
+      const ROUND_OPTS = [0, 5, 10, 20, 30, 50, 100];
+      const rCustom = ROUND_OPTS.indexOf(R) < 0;
+      s += `<div class="field"><span class="lbl">Количество раундов</span><div class="chips">`;
+      ROUND_OPTS.forEach((v) => { s += `<button type="button" class="chip ${R === v ? 'on' : ''}" data-set="rounds" data-v="${v}">${v ? v : 'Без лимита'}</button>`; });
+      s += `<button type="button" class="chip ${rCustom ? 'on' : ''}" data-set="rounds-custom">Своё…</button></div>`;
+      s += `<div class="row ${rCustom ? '' : 'hide'}" style="margin-top:8px"><input class="input" style="max-width:110px" type="number" min="1" max="100" data-set="rounds-num" value="${rCustom ? R : 15}"> <span class="muted">раундов (от 1 до 100)</span></div>`;
+      s += `<div class="hint">${R ? 'После последнего раунда побеждает тот, у кого больше жизней; при равенстве — у кого больше верных ответов.' : 'Игра идёт, пока у кого-то не закончатся жизни.'}</div></div>`;
+    }
     s += `<div class="field"><span class="lbl">Задания</span><div class="seg"><button type="button" class="${d.mode === 'all' ? 'on' : ''}" data-set="mode" data-v="all">Все вперемешку</button><button type="button" class="${d.mode === 'pick' ? 'on' : ''}" data-set="mode" data-v="pick">Выбрать номера</button></div>`;
     if (d.mode === 'pick') {
       s += `<div class="nums" style="margin-top:12px">`;
@@ -3800,6 +3824,8 @@ var SubjectIcons = (function () {
     else if (k === 'time-custom') { if (TIME_OPTS.indexOf(+d.time) >= 0) d.time = 420; }
     else if (k === 'lives-') d.lives = Math.max(1, d.lives - 1);
     else if (k === 'lives+') d.lives = Math.min(10, d.lives + 1);
+    else if (k === 'rounds') d.rounds = +v;
+    else if (k === 'rounds-custom') { if ([0, 5, 10, 20, 30, 50, 100].indexOf(+d.rounds || 0) >= 0) d.rounds = 15; }
     else if (k === 'mode') d.mode = v;
     else if (k === 'order') d.order = v;
     else if (k === 'num') { const n = +v; const i = d.nums.indexOf(n); if (i >= 0) d.nums.splice(i, 1); else d.nums.push(n); }
@@ -4329,9 +4355,16 @@ var SubjectIcons = (function () {
         onSettingsClick(key, el);
       });
       card.addEventListener('change', (e) => {
+        const key = card.querySelector('#create') ? 'duel' : 'solo';
+        const rn = e.target.closest('[data-set="rounds-num"]');
+        if (rn) {
+          app.draft[key].rounds = Math.max(1, Math.min(100, Math.round(+rn.value || 1)));
+          store.set('egeduel:set:' + key, app.draft[key]);
+          render();
+          return;
+        }
         const el = e.target.closest('[data-set="time-min"]');
         if (!el) return;
-        const key = card.querySelector('#create') ? 'duel' : 'solo';
         const m = Math.max(1, Math.min(60, Math.round(+el.value || 1)));
         app.draft[key].time = m * 60;
         store.set('egeduel:set:' + key, app.draft[key]);
@@ -4399,6 +4432,7 @@ var SubjectIcons = (function () {
             <dt>Создатель</dt><dd>${esc(S.players.host.name)}</dd>
             <dt>Время на ответ</dt><dd>${timeLabel(S.settings.time)}</dd>
             <dt>Жизни</dt><dd>${S.settings.lives}</dd>
+            <dt>Раунды</dt><dd>${roundsLabel(S.settings.rounds)}</dd>
             <dt>Задания</dt><dd>${esc(numsLabel(S.settings))}</dd>
           </dl>
           <div class="actions"><button class="btn danger" id="leave">Закрыть комнату</button></div>
@@ -4422,7 +4456,7 @@ var SubjectIcons = (function () {
       if (!online && !solo) return '<span class="pstat off">● не в сети</span>';
       if (S.phase === 'question') return p.answered || (role === me && g.ui.pendingAnswer) ? '<span class="pstat ok">✓ ответ дан</span>' : '<span class="pstat">думает…</span>';
       if (S.phase === 'result' || S.phase === 'ready') return p.ready || (role === me && g.ui.pendingReady) ? '<span class="pstat ok">✓ готов</span>' : '<span class="pstat">читает разбор</span>';
-      if (S.phase === 'over' && S.reason === 'lives') return p.ready || (role === me && g.ui.pendingReady) ? '<span class="pstat ok">✓ хочет реванш</span>' : '';
+      if (S.phase === 'over' && (S.reason === 'lives' || S.reason === 'rounds')) return p.ready || (role === me && g.ui.pendingReady) ? '<span class="pstat ok">✓ хочет реванш</span>' : '';
       return '';
     };
     const max = S.settings.lives;
@@ -4430,8 +4464,8 @@ var SubjectIcons = (function () {
     if (S.phase === 'question') {
       if (S.deadline) {
         const rem = S.deadline - (Date.now() + (me === 'guest' ? g.offset || 0 : 0));
-        center = `<div class="round-lbl">Раунд ${S.round}</div><div class="timer ${rem < 10000 ? 'low' : ''}" id="timer">${fmtTime(rem)}</div>`;
-      } else center = `<div class="round-lbl">Раунд ${S.round}</div><div class="timer inf">∞</div>`;
+        center = `<div class="round-lbl">Раунд ${S.round}${S.settings.rounds ? " из " + S.settings.rounds : ""}</div><div class="timer ${rem < 10000 ? 'low' : ''}" id="timer">${fmtTime(rem)}</div>`;
+      } else center = `<div class="round-lbl">Раунд ${S.round}${S.settings.rounds ? " из " + S.settings.rounds : ""}</div><div class="timer inf">∞</div>`;
     } else center = `<div class="round-lbl">${S.phase === 'ready' ? 'Подготовка' : S.phase === 'over' ? 'Игра окончена' : 'Раунд ' + S.round}</div>`;
     hud.className = 'hud';
     hud.innerHTML = `
@@ -4570,7 +4604,7 @@ var SubjectIcons = (function () {
       body.innerHTML = `<section class="card" style="text-align:center;padding:32px">
         <h2>${oppP ? 'Соперник найден!' : 'Ожидание'}</h2>
         <div class="versus">${Profile.card(Profile.shared(), 'Вы')}<div class="vs">VS</div>${oppP ? Profile.card(oppProfile(S, myRole() === 'host' ? 'guest' : 'host'), 'Соперник') : ''}</div>
-        <p class="muted">${timeLabel(S.settings.time)} на ответ · ${S.settings.lives} ${livesWord(S.settings.lives)} · ${esc(numsLabel(S.settings))}</p>
+        <p class="muted">${timeLabel(S.settings.time)} на ответ · ${S.settings.lives} ${livesWord(S.settings.lives)} · ${S.settings.rounds ? S.settings.rounds + ' ' + roundsWord(S.settings.rounds) : 'раунды без ограничения'} · ${esc(numsLabel(S.settings))}</p>
         <div class="actions" style="justify-content:center" id="readybox">${pend ? '<div class="waiting"><span class="dot-pulse"></span> Ждём, когда соперник нажмёт «Начать»…</div>' : '<button class="btn big" id="next">Начать дуэль</button>'}</div>
         <div class="actions" style="justify-content:center"><button class="btn danger" id="leave">Выйти</button></div>
       </section>`;
@@ -4583,7 +4617,7 @@ var SubjectIcons = (function () {
       body.innerHTML = `<section class="card"><div id="verdicts">${verdictHTML(S)}</div>${solutionHTML(S)}${nextActionsHTML(S)}</section>` + taskReview(S);
       typeset(body);
     } else if (S.phase === 'over') {
-      body.innerHTML = overHTML(S) + (S.result && S.reason === 'lives' ? `<section class="card" style="margin-top:18px"><h2>Последний раунд</h2><div id="verdicts">${verdictHTML(S)}</div>${solutionHTML(S)}</section>` + taskReview(S) : '') + historyHTML(S);
+      body.innerHTML = overHTML(S) + (S.result && (S.reason === 'lives' || S.reason === 'rounds') ? `<section class="card" style="margin-top:18px"><h2>Последний раунд</h2><div id="verdicts">${verdictHTML(S)}</div>${solutionHTML(S)}</section>` + taskReview(S) : '') + historyHTML(S);
       typeset(body);
     }
     bindBody();
@@ -4608,6 +4642,16 @@ var SubjectIcons = (function () {
       const iWon = S.winner === me;
       emoji = iWon ? '🏆' : '🏳️'; title = iWon ? 'Победа!' : 'Вы вышли из дуэли';
       sub = iWon ? 'Соперник покинул игру.' : 'Победа присуждена сопернику.';
+    } else if (S.reason === 'rounds') {
+      const ok = (r) => S.history.filter((h) => h[r]).length;
+      const score = `Жизни: ${meP.lives} : ${oppP.lives} · верных ответов: ${ok(me)} : ${ok(opp)}`;
+      if (S.winner === 'draw') { emoji = '🤝'; title = 'Ничья!'; sub = `Все ${S.settings.rounds} ${roundsWord(S.settings.rounds)} сыграны, счёт равный. ${score}`; }
+      else {
+        const iWon = S.winner === me;
+        const byLives = meP.lives !== oppP.lives;
+        emoji = iWon ? '🏆' : '😔'; title = iWon ? 'Победа!' : 'Поражение';
+        sub = `Все ${S.settings.rounds} ${roundsWord(S.settings.rounds)} сыграны. ${iWon ? 'У вас' : 'У соперника'} ${byLives ? 'больше жизней' : 'жизней поровну, но больше верных ответов'}. ${score}`;
+      }
     } else if (S.winner === 'draw') {
       emoji = '🤝'; title = 'Ничья!'; sub = 'Жизни закончились у обоих в одном раунде.';
     } else {
@@ -4619,7 +4663,7 @@ var SubjectIcons = (function () {
     const oppWants = oppP && oppP.ready;
     let actions = '';
     if (solo) actions = `<button class="btn big" id="again">Сыграть ещё</button><button class="btn ghost big" id="leave">В меню</button>`;
-    else if (S.reason === 'lives' && !g.oppLeft && g.oppOnline !== false) actions = (pend ? `<div class="waiting"><span class="dot-pulse"></span> Ждём ответа соперника на реванш…</div>` : `<button class="btn big" id="next">${oppWants ? 'Принять реванш' : 'Реванш'}</button>`) + `<button class="btn ghost big" id="leave">В меню</button>`;
+    else if ((S.reason === 'lives' || S.reason === 'rounds') && !g.oppLeft && g.oppOnline !== false) actions = (pend ? `<div class="waiting"><span class="dot-pulse"></span> Ждём ответа соперника на реванш…</div>` : `<button class="btn big" id="next">${oppWants ? 'Принять реванш' : 'Реванш'}</button>`) + `<button class="btn ghost big" id="leave">В меню</button>`;
     else actions = `<button class="btn big" id="leave">В меню</button>`;
     return `<section class="card over">
       <div class="big-emoji">${emoji}</div><h1>${title}</h1><p class="muted" style="margin:0">${sub}</p>
@@ -4628,7 +4672,7 @@ var SubjectIcons = (function () {
         <div class="stat"><b>${solved}</b><span>верно у вас</span></div>
         ${!solo && oppP ? `<div class="stat"><b>${S.history.filter((h) => h[opp]).length}</b><span>верно у соперника</span></div>` : ''}
       </div>
-      ${oppWants && !pend && S.reason === 'lives' ? '<div class="notice" style="margin-bottom:12px">Соперник предлагает реванш!</div>' : ''}
+      ${oppWants && !pend && (S.reason === 'lives' || S.reason === 'rounds') ? '<div class="notice" style="margin-bottom:12px">Соперник предлагает реванш!</div>' : ''}
       <div class="actions" style="justify-content:center">${actions}</div>
     </section>`;
   }
