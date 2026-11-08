@@ -4634,7 +4634,7 @@ var SubjectIcons = (function () {
   }
 
   // ---- гость ----
-  async function joinRoom(codeRaw) {
+  async function joinRoom(codeRaw, quiet) {
     const code = Net.normCode(codeRaw);
     app.joinCode = code;
     if (!Net.validCode(code)) { app.joinError = 'Код комнаты — 6 символов, например 2K7MQX.'; render(); return; }
@@ -4677,7 +4677,7 @@ var SubjectIcons = (function () {
     const ping = () => { if (app.game !== g) return; link.send('g2h', { type: 'ping', pid, t: Date.now() }, { qos: 0 }); pings++; g.pingTimer = setTimeout(ping, pings < 4 ? 1500 : 15000); };
     ping();
     app.busy = false;
-    app.tab = 'duel';
+    if (!quiet) app.tab = 'duel'; // при восстановлении после перезагрузки остаёмся на главной
     render();
   }
 
@@ -4796,7 +4796,7 @@ var SubjectIcons = (function () {
     if (!a) return;
     if (a.mode === 'solo') {
       const d = sess.get('egeduel:solo', null);
-      if (d && d.S) { app.game = { mode: 'solo', me: 'host', S: d.S, P: d.P || {}, ui: {} }; app.subject = subjOfState(d.S); app.tab = 'solo'; render(); }
+      if (d && d.S) { app.game = { mode: 'solo', me: 'host', S: d.S, P: d.P || {}, ui: {} }; app.subject = subjOfState(d.S); render(); }
       return;
     }
     if (a.mode === 'host') {
@@ -4807,13 +4807,13 @@ var SubjectIcons = (function () {
         app.game = { mode: 'host', me: 'host', S: d.S, P: d.P || {}, link, ui: {}, oppOnline: false };
         app.subject = subjOfState(d.S);
         bindHost(link);
-        app.tab = 'duel';
+        // остаёмся на главной: вернуться к игре можно по плашке «У вас идёт дуэль»
         commit();
         toast('Игра восстановлена');
       } catch (e) { toast('Не удалось восстановить комнату'); }
       return;
     }
-    if (a.mode === 'guest') { app.tab = 'duel'; joinRoom(a.code); }
+    if (a.mode === 'guest') { joinRoom(a.code, true); }
   }
 
   /* ---------- настройки ---------- */
