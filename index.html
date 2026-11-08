@@ -447,6 +447,38 @@ header.top .wrap { max-width: none; padding-left: 28px; padding-right: 28px; }
 .hm-legend .hm-c { width: 13px; height: 13px; border-radius: 3px; }
 @media (max-width: 640px) { .streak-stats { grid-template-columns: repeat(2, 1fr); } .modal { padding: 10px; } }
 
+/* ---------- главная ---------- */
+.home-hero { display: flex; align-items: center; gap: 28px; padding: 28px; overflow: hidden; position: relative; background: radial-gradient(120% 140% at 0% 0%, var(--accent-soft), var(--card) 60%); }
+.home-logo { width: 140px; height: 140px; border-radius: 28px; flex: none; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.home-hero h1 { font-size: 32px; margin: 4px 0 10px; }
+.home-kicker { font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.home-feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.home-feat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.home-feat b { font-size: 15px; }
+.home-feat span { font-size: 13.5px; color: var(--ink2); }
+.home-h2 { margin: 30px 0 14px; }
+.subjects { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.subject { --sc: var(--accent); position: relative; text-align: left; border: 1.5px solid var(--line); background: var(--card); border-radius: 18px; padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-height: 150px; transition: transform .15s, border-color .15s, box-shadow .15s; overflow: hidden; color: var(--ink); font: inherit; }
+.subject::before { content: ""; position: absolute; inset: 0; background: radial-gradient(100% 80% at 100% 0%, color-mix(in srgb, var(--sc) 22%, transparent), transparent 70%); pointer-events: none; }
+.subject:hover { transform: translateY(-3px); border-color: var(--sc); box-shadow: 0 10px 26px color-mix(in srgb, var(--sc) 25%, transparent); }
+.subject-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; font-size: 28px; background: color-mix(in srgb, var(--sc) 18%, var(--bg)); position: relative; }
+.subject-name { font-family: "Unbounded", sans-serif; font-weight: 700; font-size: 17px; margin-top: 6px; position: relative; }
+.subject-note { font-size: 13px; color: var(--ink2); position: relative; }
+.subject-go { position: absolute; right: 16px; top: 16px; font-size: 20px; color: var(--sc); font-weight: 800; transition: transform .15s; }
+.subject:hover .subject-go { transform: translateX(4px); }
+.soon { text-align: center; padding: 56px 24px; max-width: 720px; margin: 20px auto; background: radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--sc) 16%, var(--card)), var(--card) 70%); }
+.soon-ic { font-size: 64px; line-height: 1; margin-bottom: 14px; }
+.soon h1 { font-size: 26px; margin: 10px auto 22px; max-width: 520px; }
+@media (max-width: 760px) { .home-hero { flex-direction: column; text-align: center; padding: 22px 18px; gap: 16px; } .home-logo { width: 110px; height: 110px; } .home-hero h1 { font-size: 24px; } .home-feats { grid-template-columns: 1fr; } .subjects { grid-template-columns: 1fr 1fr; } .subject { min-height: 0; padding: 14px; } .subject-name { font-size: 15px; } .soon h1 { font-size: 21px; } }
+@media (max-width: 340px) { .subjects { grid-template-columns: 1fr; } }
+#main:has(#home-page) { max-width: 1180px; }
+.subjects { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.subject-name { font-size: 15px; letter-spacing: -.01em; hyphens: auto; -webkit-hyphens: auto; }
+@media (max-width: 1100px) { .subjects { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .subjects { grid-template-columns: 1fr 1fr; } .subject:last-child:nth-child(odd) { grid-column: span 2; } }
+@media (max-width: 340px) { .subjects { grid-template-columns: 1fr !important; } .subject:last-child:nth-child(odd) { grid-column: auto; } }
+@media (max-width: 760px) { .subject-name { font-size: 14px; } }
+
 </style>
 </head>
 <body>
@@ -3105,7 +3137,7 @@ var Cloud = (function () {
   const HEART = '<svg viewBox="0 0 24 24" class="heart" aria-hidden="true"><path fill="currentColor" d="M12 21.2s-7.6-4.7-9.7-9.5C.8 8.2 3 4.4 6.7 4.4c2.1 0 3.6 1.1 4.5 2.6.9-1.5 2.4-2.6 4.5-2.6 3.7 0 5.9 3.8 4.4 7.3-2.1 4.8-8.1 9.5-8.1 9.5z"/></svg>';
 
   const app = {
-    tab: 'duel',
+    tab: 'home',
     draft: { duel: Object.assign({}, DEFAULTS, store.get('egeduel:set:duel', {})), solo: Object.assign({}, DEFAULTS, store.get('egeduel:set:solo', {})) },
     name: Profile.me.name || store.get('egeduel:name', ''),
     game: null,
@@ -3593,7 +3625,9 @@ var Cloud = (function () {
     if (g && app.tab === gameTab) { renderGame(); return; }
     app.rendered = null;
     if (app.tab === 'profile') { if (!$('#profile-page')) renderProfile(); return; }
-    if (app.tab === 'duel') renderDuelHome();
+    if (app.tab === 'home') renderHome();
+    else if (app.tab === 'soon') renderSoon();
+    else if (app.tab === 'duel') renderDuelHome();
     else if (app.tab === 'solo') renderSoloHome();
     else renderRules();
   }
@@ -3978,6 +4012,57 @@ var Cloud = (function () {
       if (app.game && app.game.mode !== 'solo') { toast('Сначала завершите дуэль'); return; }
       startSolo();
     };
+  }
+
+  /* ---------- главная страница ---------- */
+  const SUBJECTS = [
+    { id: 'chem', name: 'Химия', icon: '🧪', color: '#12b886', note: 'Реакции, расчёты, органика' },
+    { id: 'rus', name: 'Русский язык', icon: '📖', color: '#4c6ef5', note: 'Орфография, пунктуация, сочинение' },
+    { id: 'soc', name: 'Общество­знание', icon: '🏛️', color: '#f59f00', note: 'Право, экономика, политика' },
+    { id: 'phys', name: 'Физика', icon: '⚛️', color: '#e64980', note: 'Механика, электричество, оптика' },
+    { id: 'math', name: 'Профильная математика', icon: '📐', color: '#7950f2', note: 'Все 19 заданий ЕГЭ' },
+  ];
+
+  function renderHome() {
+    const logo = ($('.logo .mark-img') || {}).src || '';
+    main().innerHTML = `
+      ${activeGameBanner('home')}
+      <div id="home-page"></div>
+      <section class="home-hero card">
+        ${logo ? `<img class="home-logo" src="${logo}" alt="ЕГЭ — могай с нами">` : ''}
+        <div class="home-hero-text">
+          <div class="home-kicker">ЕГЭ — могай с нами</div>
+          <h1>Готовься к ЕГЭ в игре — одному или с другом</h1>
+          <p class="lead" style="margin-bottom:0">Мы делаем тренажёр, где подготовка к экзамену похожа на игру. Задания составлены по стандартам ЕГЭ и открытому банку ФИПИ, после каждого — краткое и подробное решение. Сражайтесь с друзьями в дуэлях по ссылке, тренируйтесь в соло, держите огонёк каждый день и следите за прогрессом в профиле.</p>
+        </div>
+      </section>
+      <div class="home-feats">
+        <div class="home-feat"><b>⚔️ Дуэли 1 на 1</b><span>Отправьте другу ссылку — и решайте одни и те же задания на скорость и точность.</span></div>
+        <div class="home-feat"><b>🧠 Разбор каждого задания</b><span>Краткое решение сразу, подробное — по одной кнопке.</span></div>
+        <div class="home-feat"><b>🔥 Огонёк каждый день</b><span>Решайте хотя бы одно задание в день и не дайте серии погаснуть.</span></div>
+      </div>
+      <h2 class="home-h2">Выберите предмет</h2>
+      <div class="subjects">
+        ${SUBJECTS.map((s) => `<button type="button" class="subject" data-subject="${s.id}" style="--sc:${s.color}"><span class="subject-ic">${s.icon}</span><span class="subject-name">${esc(s.name)}</span><span class="subject-note">${esc(s.note)}</span><span class="subject-go">→</span></button>`).join('')}
+      </div>`;
+    $$('[data-go]').forEach((b) => (b.onclick = () => { app.tab = b.dataset.go; render(); }));
+    $$('[data-subject]').forEach((b) => (b.onclick = () => {
+      app.subject = SUBJECTS.find((s) => s.id === b.dataset.subject);
+      app.tab = 'soon';
+      render(); animatePage(); window.scrollTo(0, 0);
+    }));
+  }
+
+  function renderSoon() {
+    const s = app.subject || SUBJECTS[0];
+    main().innerHTML = `
+      <section class="soon card" style="--sc:${s.color}">
+        <div class="soon-ic">${s.icon}</div>
+        <div class="home-kicker">${esc(s.name)}</div>
+        <h1>Пока здесь ничего нет, но мы работаем над этим :)</h1>
+        <div class="actions" style="justify-content:center"><button type="button" class="btn big" id="soon-back">← На главную</button></div>
+      </section>`;
+    $('#soon-back').onclick = () => { app.tab = 'home'; render(); animatePage(); window.scrollTo(0, 0); };
   }
 
   function renderRules() {
@@ -4401,7 +4486,7 @@ var Cloud = (function () {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(movePill);
     movePill();
     setTimeout(() => { movePill(); const p = $('.tab-pill'); if (p) p.classList.add('anim'); }, 60);
-    $('.logo').onclick = () => { app.tab = 'duel'; render(); };
+    $('.logo').onclick = () => { if (app.tab === 'home') return; app.tab = 'home'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#me-btn').onclick = () => { if (app.tab === 'profile') return; app.tab = 'profile'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#login-btn').onclick = doLogin;
     $('#streak-btn').onclick = openStreak;
