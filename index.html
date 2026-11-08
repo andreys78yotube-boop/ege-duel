@@ -579,6 +579,22 @@ body.on-home .login-btn:not(.hide), body.on-home .login-btn.hide + .streak-btn {
 @media (max-width: 760px) { .bl-match { grid-template-columns: 1fr; } }
 .sol-row { padding: 4px 0; }
 
+/* ---------- #, друзья, витрина ---------- */
+.pcard-tag { font-family: ui-monospace, Consolas, monospace; font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .04em; }
+.my-tag { margin: 12px 0 4px; font-size: 15px; }
+.my-tag b { font-family: ui-monospace, Consolas, monospace; font-size: 18px; color: var(--accent); letter-spacing: .06em; margin-right: 6px; }
+.friend-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; margin-top: 8px; border: 1px solid var(--line); background: var(--bg); border-radius: 12px; cursor: pointer; text-align: left; font: inherit; color: inherit; transition: border-color .15s; }
+.friend-row:hover { border-color: var(--accent); }
+.fr-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.fr-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-main .muted { font-size: 13px; }
+.fr-go { font-size: 22px; color: var(--ink3); }
+.empty-show { border: 1.5px dashed var(--line); border-radius: 14px; padding: 22px 14px; text-align: center; color: var(--ink3); font-weight: 600; }
+.pview { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.pview-name { font-family: "Unbounded", sans-serif; font-size: 20px; font-weight: 700; margin-top: 10px; overflow-wrap: anywhere; }
+.pview .pstats { grid-template-columns: repeat(2, 1fr); }
+.pview-show { width: 100%; text-align: left; }
+
 </style>
 </head>
 <body>
@@ -4522,7 +4538,27 @@ var Profile = (function () {
       stats: Object.assign({}, EMPTY_STATS, me.stats),
       days: Streak.normalize(me.days).slice(-400),
       counts: cleanCounts(me.counts),
+      tag: me.tag || null,
+      friends: (me.friends || []).filter((x) => typeof x === 'string').slice(0, 200),
     };
+  }
+  // Публичная карточка (коллекция profiles): то, что видят другие по #
+  function publicData() {
+    const st = me.stats;
+    return {
+      name: (me.name || '').trim().slice(0, 24) || 'Игрок', bio: String(me.bio || '').slice(0, BIO_MAX), photo: me.photo || null,
+      preset: me.preset | 0, color: me.color | 0, tag: me.tag,
+      stats: { duels: st.duels, wins: st.wins, bestSolo: st.bestSolo, solved: st.solved, streak: Streak.info(me.days).count, bestStreak: Streak.info(me.days).best },
+    };
+  }
+  function sanitizePublic(p) {
+    const b = sanitize(p);
+    if (!b) return null;
+    const st = (p && p.stats) || {};
+    const int = (v) => Math.max(0, Math.min(1e6, Math.floor(+v || 0)));
+    b.tag = typeof p.tag === 'string' && /^[A-Z0-9]{6}$/.test(p.tag) ? p.tag : null;
+    b.stats = Object.assign(b.stats, { solved: int(st.solved), streak: int(st.streak), bestStreak: int(st.bestStreak) });
+    return b;
   }
   function applyCloud(d) {
     if (!d || typeof d !== 'object') return;
@@ -4544,6 +4580,8 @@ var Profile = (function () {
     const cc = cleanCounts(d.counts), lc = cleanCounts(me.counts);
     Object.keys(lc).forEach((k) => { cc[k] = Math.max(cc[k] || 0, lc[k]); });
     me.counts = cleanCounts(cc);
+    if (typeof d.tag === 'string' && /^[A-Z0-9]{6}$/.test(d.tag)) me.tag = d.tag;
+    me.friends = Array.isArray(d.friends) ? d.friends.filter((x) => typeof x === 'string').slice(0, 200) : [];
     saveLocal();
   }
   // При регистрации: имя и фото из Google, если своих нет
@@ -4573,7 +4611,7 @@ var Profile = (function () {
   }
   // После выхода из аккаунта — чистый профиль на этом устройстве
   function resetLocal() {
-    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [], counts: {} };
+    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [], counts: {}, tag: null, friends: [] };
     saveLocal();
   }
 
@@ -4585,6 +4623,7 @@ var Profile = (function () {
       photo: me.photo || null,
       preset: me.preset | 0,
       color: me.color | 0,
+      tag: me.tag || null,
       stats: { duels: me.stats.duels, wins: me.stats.wins, bestSolo: me.stats.bestSolo, streak: Streak.info(me.days).count },
     };
   }
@@ -4601,6 +4640,7 @@ var Profile = (function () {
       photo,
       preset: Math.abs(p.preset | 0) % PRESETS.length,
       color: Math.abs(p.color | 0) % COLORS.length,
+      tag: typeof p.tag === 'string' && /^[A-Z0-9]{6}$/.test(p.tag) ? p.tag : null,
       stats: { duels: int(st.duels), wins: int(st.wins), bestSolo: int(st.bestSolo), streak: Math.min(int(st.streak), 5000) },
     };
   }
@@ -4636,7 +4676,7 @@ var Profile = (function () {
       ${avatar(p, 64)}
       <div class="pcard-body">
         ${label ? `<div class="pcard-lbl">${esc(label)}</div>` : ''}
-        <div class="pcard-name">${esc(p.name || 'Игрок')}</div>
+        <div class="pcard-name">${esc(p.name || 'Игрок')}${p.tag ? ` <span class="pcard-tag">#${esc(p.tag)}</span>` : ''}</div>
         ${p.bio ? `<div class="pcard-bio">${esc(p.bio)}</div>` : '<div class="pcard-bio muted">Без описания</div>'}
         ${p.stats ? `<div class="pcard-stats">${statLine(p.stats)}</div>` : ''}
       </div>
@@ -4706,7 +4746,7 @@ var Profile = (function () {
   const streak = () => Streak.info(me.days);
 
   return {
-    get me() { return me; }, save, shared, cloudData, applyCloud, fillFromGoogle, resetLocal, markToday, streak, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
+    get me() { return me; }, save, shared, cloudData, publicData, sanitizePublic, applyCloud, fillFromGoogle, resetLocal, markToday, streak, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
     PRESETS, COLORS, BIO_MAX, esc,
   };
 })();
@@ -4782,9 +4822,31 @@ var Cloud = (function () {
     } else {
       // регистрация: берём текущий профиль, имя и фото — из Google, если своих нет
       await Profile.fillFromGoogle(user);
-      await push();
       Profile.me.isNew = true;
     }
+    if (!Profile.me.tag) await claimTag();
+    await push();
+  }
+
+  /* ---- уникальный # пользователя: документ tags/{TAG} = { uid } создаётся один раз ---- */
+  const TAG_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const randomTag = () => { let s = ''; const a = new Uint32Array(6); crypto.getRandomValues(a); for (let i = 0; i < 6; i++) s += TAG_ALPHA[a[i] % TAG_ALPHA.length]; return s; };
+  async function claimTag() {
+    for (let i = 0; i < 8; i++) {
+      const tag = randomTag();
+      const r = db.collection('tags').doc(tag);
+      try {
+        await db.runTransaction(async (tx) => {
+          const s = await tx.get(r);
+          if (s.exists) throw new Error('taken');
+          tx.set(r, { uid: user.uid });
+        });
+        Profile.me.tag = tag;
+        Profile.save();
+        return tag;
+      } catch (e) { if (e.message !== 'taken') throw e; }
+    }
+    throw new Error('Не удалось выдать #');
   }
 
   async function push() {
@@ -4792,6 +4854,46 @@ var Cloud = (function () {
     const d = Profile.cloudData();
     d.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
     await ref().set(d);
+    // публичная карточка профиля — по ней друзья находят пользователя по #
+    if (Profile.me.tag) {
+      const pub = Profile.publicData();
+      pub.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('profiles').doc(user.uid).set(pub);
+    }
+  }
+
+  /* ---- поиск и друзья ---- */
+  const normTag = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  async function getProfile(uid) {
+    const s = await db.collection('profiles').doc(uid).get();
+    return s.exists ? Object.assign({ uid }, Profile.sanitizePublic(s.data())) : null;
+  }
+  async function findByTag(raw) {
+    if (!user) throw new Error('Войдите через Google, чтобы искать профили');
+    const tag = normTag(raw);
+    if (!/^[A-Z0-9]{6}$/.test(tag)) throw new Error('# состоит из 6 латинских букв и цифр, например #K7M2QX');
+    const t = await db.collection('tags').doc(tag).get();
+    if (!t.exists) return null;
+    return getProfile(t.data().uid);
+  }
+  async function friendsProfiles() {
+    if (!user) return [];
+    const list = await Promise.all((Profile.me.friends || []).map((uid) => getProfile(uid).catch(() => null)));
+    return list.filter(Boolean);
+  }
+  async function addFriend(uid) {
+    if (!user || uid === user.uid) return;
+    const f = Profile.me.friends || (Profile.me.friends = []);
+    if (f.indexOf(uid) >= 0) return;
+    if (f.length >= 200) throw new Error('В списке друзей уже 200 человек');
+    f.push(uid);
+    Profile.save();
+    await push();
+  }
+  async function removeFriend(uid) {
+    Profile.me.friends = (Profile.me.friends || []).filter((x) => x !== uid);
+    Profile.save();
+    await push();
   }
 
   function schedulePush() {
@@ -4801,7 +4903,7 @@ var Cloud = (function () {
   }
 
   return {
-    init, signIn, signOut, schedulePush,
+    init, signIn, signOut, schedulePush, findByTag, friendsProfiles, addFriend, removeFriend, getProfile, normTag,
     on: (f) => subs.push(f),
     get available() { return available(); },
     get ready() { return ready; },
@@ -5737,39 +5839,40 @@ var SubjectIcons = (function () {
   function renderProfile() {
     const p = Profile.me;
     const st = p.stats;
-    const presets = Profile.PRESETS.map((e, i) => `<button type="button" class="preset ${!p.photo && p.preset === i ? 'on' : ''}" data-preset="${i}" style="background:${Profile.COLORS[p.color % Profile.COLORS.length]}" aria-label="Аватар ${e}">${e}</button>`).join('');
-    const colors = Profile.COLORS.map((c, i) => `<button type="button" class="swatch ${p.color === i ? 'on' : ''}" data-color="${i}" style="background:${c}" aria-label="Цвет фона"></button>`).join('');
     main().innerHTML = `
       <div id="profile-page">
       <h1>Мой профиль</h1>
-      <p class="lead">Так вас увидит соперник в дуэли: аватар, имя и пара слов о себе. ${Cloud.user ? "Профиль сохраняется в вашем Google-аккаунте." : "Без входа профиль хранится только в этом браузере. Войдите через Google, чтобы он сохранялся в аккаунте."}</p>
+      <p class="lead">Так вас увидит соперник в дуэли и друзья по вашему #. ${Cloud.user ? 'Профиль сохраняется в вашем Google-аккаунте.' : 'Без входа профиль хранится только в этом браузере. Войдите через Google, чтобы получить свой # и добавлять друзей.'}</p>
       <div class="profile-grid">
-        <section class="card">
-          <h2>Аватар</h2>
-          <div class="row" style="gap:16px;align-items:center;margin-bottom:16px">
-            <div id="ava-big">${Profile.avatar(Profile.shared(), 96)}</div>
-            <div class="stack" style="flex:1">
-              <div class="row">
-                <label class="btn soft" for="photo-in" style="cursor:pointer">📷 Загрузить фото</label>
-                <input type="file" id="photo-in" accept="image/*" class="hide">
-                ${p.photo ? '<button type="button" class="btn ghost" id="photo-del">Убрать фото</button>' : ''}
+        <div class="stack">
+          <section class="card">
+            <h2>Аватар</h2>
+            <div class="row" style="gap:16px;align-items:center;margin-bottom:6px">
+              <div id="ava-big">${Profile.avatar(Profile.shared(), 96)}</div>
+              <div class="stack" style="flex:1">
+                <div class="row">
+                  <label class="btn soft" for="photo-in" style="cursor:pointer">📷 Загрузить фото</label>
+                  <input type="file" id="photo-in" accept="image/*" class="hide">
+                  ${p.photo ? '<button type="button" class="btn ghost" id="photo-del">Убрать фото</button>' : ''}
+                </div>
+                <div class="hint" style="margin-top:6px">Фото обрежется по центру до квадрата и уменьшится.</div>
               </div>
-              <div class="hint" style="margin-top:6px">Фото обрежется по центру до квадрата и уменьшится.</div>
             </div>
-          </div>
-          <span class="lbl">Или выберите картинку</span>
-          <div class="presets">${presets}</div>
-          <span class="lbl" style="margin-top:14px">Цвет фона</span>
-          <div class="row" style="gap:8px">${colors}</div>
-          <h2 style="margin-top:26px">О себе</h2>
-          <div class="field"><label for="p-name">Имя</label><input class="input" id="p-name" maxlength="24" placeholder="Например, Аня" value="${esc(p.name)}" data-name></div>
-          <div class="field"><label for="p-bio">Описание</label>
-            <textarea class="input" id="p-bio" rows="3" maxlength="${Profile.BIO_MAX}" placeholder="Например: 11 класс, целюсь на 90+, люблю параметры">${esc(p.bio)}</textarea>
-            <div class="hint"><span id="bio-count">${p.bio.length}</span>/${Profile.BIO_MAX} · сохраняется автоматически</div>
-          </div>
-        </section>
+            <h2 style="margin-top:22px">О себе</h2>
+            <div class="field"><label for="p-name">Имя</label><input class="input" id="p-name" maxlength="24" placeholder="Например, Аня" value="${esc(p.name)}" data-name></div>
+            <div class="field"><label for="p-bio">Описание</label>
+              <textarea class="input" id="p-bio" rows="3" maxlength="${Profile.BIO_MAX}" placeholder="Например: 11 класс, целюсь на 90+, люблю параметры">${esc(p.bio)}</textarea>
+              <div class="hint"><span id="bio-count">${p.bio.length}</span>/${Profile.BIO_MAX} · сохраняется автоматически</div>
+            </div>
+          </section>
+          <section class="card">
+            <h3>🏅 Витрина достижений</h3>
+            <div class="empty-show">Здесь пока ничего нет(</div>
+          </section>
+        </div>
         <div class="stack">
           ${Cloud.available ? `<section class="card" id="acc-card">${accountHTML()}</section>` : ''}
+          <section class="card" id="friends-card">${friendsCardHTML()}</section>
           <section class="card">
             <h3>Так вас видит соперник</h3>
             <div id="p-preview">${Profile.card(Profile.shared())}</div>
@@ -5786,14 +5889,13 @@ var SubjectIcons = (function () {
               <div class="stat"><b>${st.solved}</b><span>задач решено</span></div>
               <div class="stat"><b>${st.duels ? Math.round((st.wins / st.duels) * 100) : 0}%</b><span>побед в дуэлях</span></div>
             </div>
-            <div class="actions"><button type="button" class="link" id="stats-reset" style="color:var(--bad)">Сбросить статистику</button></div>
           </section>
         </div>
       </div>
       </div>`;
     bindCommon();
     bindAccount();
-    bindStreakCard();
+    bindFriends();
     const bio = $('#p-bio');
     bio.addEventListener('input', () => {
       Profile.me.bio = bio.value.slice(0, Profile.BIO_MAX);
@@ -5801,8 +5903,6 @@ var SubjectIcons = (function () {
       $('#bio-count').textContent = Profile.me.bio.length;
       updateProfilePreview();
     });
-    $$('[data-preset]').forEach((b) => (b.onclick = () => { Profile.me.preset = +b.dataset.preset; Profile.me.photo = null; Profile.save(); renderProfile(); renderHeaderAvatar(); }));
-    $$('[data-color]').forEach((b) => (b.onclick = () => { Profile.me.color = +b.dataset.color; Profile.save(); renderProfile(); renderHeaderAvatar(); }));
     $('#photo-in').onchange = async (e) => {
       const f = e.target.files && e.target.files[0];
       if (!f) return;
@@ -5814,7 +5914,111 @@ var SubjectIcons = (function () {
       renderProfile(); renderHeaderAvatar();
     };
     if ($('#photo-del')) $('#photo-del').onclick = () => { Profile.me.photo = null; Profile.save(); renderProfile(); renderHeaderAvatar(); };
-    $('#stats-reset').onclick = () => { if (confirm('Сбросить всю статистику?')) { Profile.resetStats(); renderProfile(); } };
+  }
+
+  /* ---------- #, друзья, поиск профилей ---------- */
+  function friendsCardHTML() {
+    if (!Cloud.available) return '<h3>Друзья</h3><p class="muted" style="margin:0">Друзья доступны только на сайте с подключённым входом через Google.</p>';
+    if (!Cloud.user) return `<h3>Друзья</h3><p class="muted" style="margin:0 0 12px;font-size:14px">Войдите через Google — вы получите свой уникальный # и сможете находить друзей по их #.</p><button class="btn google wide" id="login2">${GOOGLE_G} Войти через Google</button>`;
+    const tag = Profile.me.tag;
+    return `<div class="row" style="align-items:center"><h3 style="margin:0">Друзья</h3><span class="sp"></span><button type="button" class="btn" id="add-friend">＋ Добавить друга</button></div>
+      <div class="my-tag">Ваш #: ${tag ? `<b>#${esc(tag)}</b> <button type="button" class="link" id="copy-tag">Скопировать</button>` : '<span class="muted">выдаётся…</span>'}</div>
+      <div class="hint" style="margin:0 0 12px">Отправьте свой # другу — по нему он найдёт ваш профиль.</div>
+      <div id="friends-list"><div class="waiting"><span class="dot-pulse"></span> Загружаем друзей…</div></div>`;
+  }
+
+  function friendRow(fp) {
+    return `<button type="button" class="friend-row" data-friend="${esc(fp.uid)}">${Profile.avatar(fp, 40)}<span class="fr-main"><b>${esc(fp.name)}</b><span class="muted">#${esc(fp.tag || '')}${fp.stats && fp.stats.streak ? ' · 🔥 ' + fp.stats.streak : ''}</span></span><span class="fr-go">›</span></button>`;
+  }
+
+  async function loadFriends() {
+    const box = $('#friends-list');
+    if (!box || !Cloud.user) return;
+    if (!(Profile.me.friends || []).length) { box.innerHTML = '<p class="muted" style="margin:0;font-size:14px">Пока никого нет. Нажмите «Добавить друга» и введите его #.</p>'; return; }
+    try {
+      const list = await Cloud.friendsProfiles();
+      app.friendsCache = list;
+      const b2 = $('#friends-list');
+      if (!b2) return;
+      b2.innerHTML = list.length ? list.map(friendRow).join('') : '<p class="muted" style="margin:0;font-size:14px">Не удалось найти профили друзей.</p>';
+      $$('[data-friend]').forEach((b) => (b.onclick = () => { const fp = (app.friendsCache || []).find((x) => x.uid === b.dataset.friend); if (fp) showProfileModal(fp); }));
+    } catch (e) { box.innerHTML = '<p class="notice bad" style="margin:0">Не удалось загрузить друзей. Проверьте интернет.</p>'; }
+  }
+
+  function bindFriends() {
+    if ($('#login2')) $('#login2').onclick = doLogin;
+    if ($('#copy-tag')) $('#copy-tag').onclick = () => copy('#' + Profile.me.tag);
+    if ($('#add-friend')) $('#add-friend').onclick = openFindModal;
+    loadFriends();
+  }
+
+  function modal(html) {
+    let m = $('#modal');
+    if (!m) { m = document.createElement('div'); m.id = 'modal'; m.className = 'modal'; document.body.appendChild(m); }
+    m.innerHTML = `<div class="modal-box card" role="dialog">${html}</div>`;
+    m.classList.add('show');
+    const close = () => { m.classList.remove('show'); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    m.onclick = (e) => { if (e.target === m) close(); };
+    $$('[data-close]', m).forEach((b) => (b.onclick = close));
+    return { el: m, close };
+  }
+
+  function profileBlock(fp) {
+    const st = fp.stats || {};
+    return `<div class="pview">
+      ${Profile.avatar(fp, 84)}
+      <div class="pview-name">${esc(fp.name)}</div>
+      ${fp.tag ? `<div class="pcard-tag">#${esc(fp.tag)}</div>` : ''}
+      ${fp.bio ? `<div class="pcard-bio" style="text-align:center;margin-top:8px">${esc(fp.bio)}</div>` : '<div class="pcard-bio muted" style="text-align:center;margin-top:8px">Без описания</div>'}
+      <div class="pstats" style="margin-top:14px;width:100%">
+        <div class="stat"><b>${st.duels || 0}</b><span>дуэлей</span></div>
+        <div class="stat"><b>${st.wins || 0}</b><span>побед</span></div>
+        <div class="stat"><b>${st.solved || 0}</b><span>задач решено</span></div>
+        <div class="stat"><b>🔥 ${st.streak || 0}</b><span>дней подряд</span></div>
+      </div>
+      <div class="pview-show"><h3 style="margin:14px 0 6px">🏅 Витрина достижений</h3><div class="empty-show">Здесь пока ничего нет(</div></div>
+    </div>`;
+  }
+
+  function showProfileModal(fp) {
+    const isMe = Cloud.user && fp.uid === Cloud.user.uid;
+    const isFriend = (Profile.me.friends || []).indexOf(fp.uid) >= 0;
+    const btn = isMe ? '<div class="notice" style="width:100%;text-align:center">Это ваш профиль</div>'
+      : isFriend ? '<button type="button" class="btn danger" id="fr-remove">Удалить из друзей</button>'
+      : '<button type="button" class="btn" id="fr-add">＋ Добавить в друзья</button>';
+    const m = modal(`<div class="row" style="justify-content:flex-end"><button type="button" class="modal-x" data-close aria-label="Закрыть">×</button></div>${profileBlock(fp)}<div class="actions" style="justify-content:center">${btn}</div>`);
+    const add = $('#fr-add', m.el), rem = $('#fr-remove', m.el);
+    if (add) add.onclick = async () => {
+      add.disabled = true;
+      try { await Cloud.addFriend(fp.uid); toast(fp.name + ' теперь у вас в друзьях'); m.close(); renderProfile(); }
+      catch (e) { add.disabled = false; toast(e.message || 'Не удалось добавить'); }
+    };
+    if (rem) rem.onclick = async () => {
+      if (!confirm('Удалить ' + fp.name + ' из друзей?')) return;
+      try { await Cloud.removeFriend(fp.uid); toast('Удалено из друзей'); m.close(); renderProfile(); }
+      catch (e) { toast(e.message || 'Не удалось удалить'); }
+    };
+  }
+
+  function openFindModal() {
+    const m = modal(`<div class="row" style="align-items:center"><h3 style="margin:0">Добавить друга</h3><span class="sp"></span><button type="button" class="modal-x" data-close aria-label="Закрыть">×</button></div>
+      <p class="muted" style="font-size:14px;margin:8px 0 12px">Введите # друга — его можно найти у него в профиле.</p>
+      <div class="answer-row"><input class="input" id="find-tag" maxlength="8" placeholder="#K7M2QX" autocomplete="off" style="font-family:Unbounded,monospace;letter-spacing:.08em;text-transform:uppercase"><button type="button" class="btn" id="find-go">Найти</button></div>
+      <div id="find-res" style="margin-top:14px"></div>`);
+    const inp = $('#find-tag', m.el), res = $('#find-res', m.el);
+    const go = async () => {
+      res.innerHTML = '<div class="waiting"><span class="dot-pulse"></span> Ищем…</div>';
+      try {
+        const fp = await Cloud.findByTag(inp.value);
+        if (!fp) { res.innerHTML = '<div class="notice bad">Профиль с таким # не найден.</div>'; return; }
+        showProfileModal(fp);
+      } catch (e) { res.innerHTML = `<div class="notice bad">${esc(e.message || 'Ошибка поиска')}</div>`; }
+    };
+    $('#find-go', m.el).onclick = go;
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    setTimeout(() => inp.focus(), 50);
   }
 
   function updateProfilePreview() {

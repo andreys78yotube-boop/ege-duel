@@ -1,19 +1,49 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Профиль игрока: читать и менять может только сам владелец
-    match /users/{uid} {
-      allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'days', 'counts', 'updatedAt'])
-        && (!('counts' in request.resource.data) || (request.resource.data.counts is map && request.resource.data.counts.size() <= 400))
-        && (!('days' in request.resource.data) || (request.resource.data.days is list && request.resource.data.days.size() <= 400))
-        && request.resource.data.name is string && request.resource.data.name.size() <= 24
-        && request.resource.data.bio is string && request.resource.data.bio.size() <= 160
-        && (request.resource.data.photo == null || (request.resource.data.photo is string && request.resource.data.photo.size() <= 60000))
-        && request.resource.data.preset is int && request.resource.data.color is int
-        && request.resource.data.stats is map;
+    function signedIn() { return request.auth != null; }
+    function isTag(t) { return t is string && t.matches('^[A-Z0-9]{6}$'); }
+    // # принадлежит именно этому пользователю
+    function ownsTag(t, uid) { return isTag(t) && exists(/databases/$(database)/documents/tags/$(t)) && get(/databases/$(database)/documents/tags/$(t)).data.uid == uid; }
+    function okCommon(d) {
+      return d.name is string && d.name.size() <= 24
+        && d.bio is string && d.bio.size() <= 160
+        && (d.photo == null || (d.photo is string && d.photo.size() <= 60000))
+        && d.preset is int && d.color is int
+        && d.stats is map;
     }
+
+    // Личный профиль игрока: читать и менять может только сам владелец
+    match /users/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'days', 'counts', 'tag', 'friends', 'updatedAt'])
+        && okCommon(request.resource.data)
+        && (!('days' in request.resource.data) || (request.resource.data.days is list && request.resource.data.days.size() <= 400))
+        && (!('counts' in request.resource.data) || (request.resource.data.counts is map && request.resource.data.counts.size() <= 400))
+        && (!('friends' in request.resource.data) || (request.resource.data.friends is list && request.resource.data.friends.size() <= 200))
+        && (!('tag' in request.resource.data) || request.resource.data.tag == null || ownsTag(request.resource.data.tag, uid));
+    }
+
+    // Публичная карточка: видят все вошедшие пользователи, меняет только владелец
+    match /profiles/{uid} {
+      allow read: if signedIn();
+      allow delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'tag', 'updatedAt'])
+        && okCommon(request.resource.data)
+        && ownsTag(request.resource.data.tag, uid);
+    }
+
+    // # → uid. Создаётся один раз, изменить или удалить нельзя
+    match /tags/{tag} {
+      allow read: if signedIn();
+      allow create: if signedIn() && isTag(tag)
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
