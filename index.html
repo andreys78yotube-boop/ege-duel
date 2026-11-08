@@ -3249,14 +3249,14 @@ var SubjectIcons = (function () {
     `<circle class="soc-spark" cx="33.5" cy="17" r="5" fill="#fff3bf"/>`,
     'sic-soc');
 
-  // Физика: три светящиеся точки-электроны на орбитах
-  const orbit = (rot, dur, begin) => `<g transform="rotate(${rot} 32 32)">` +
+  // Физика: атом с тремя орбитами и одним светящимся электроном
+  const orbit = (rot, dur, begin, electron) => `<g transform="rotate(${rot} 32 32)">` +
     `<ellipse cx="32" cy="32" rx="25" ry="9.5" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.6"/>` +
-    `<circle r="3.2" fill="#fff" filter="url(#sic-eglow)"><animateMotion dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="M7 32 A25 9.5 0 1 0 57 32 A25 9.5 0 1 0 7 32"/></circle></g>`;
+    (electron ? `<circle r="3.2" fill="#fff" filter="url(#sic-eglow)"><animateMotion dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="M7 32 A25 9.5 0 1 0 57 32 A25 9.5 0 1 0 7 32"/></circle>` : ``) + `</g>`;
   const phys = svg(
     `<defs><filter id="sic-eglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2" result="b"/><feFlood flood-color="#e599f7"/><feComposite in2="b" operator="in" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
     `<radialGradient id="sic-nuc"><stop offset="0" stop-color="#fcc2d7"/><stop offset="1" stop-color="#e64980"/></radialGradient></defs>` +
-    orbit(0, 2.4, 0) + orbit(60, 2.9, -0.8) + orbit(-60, 2.1, -1.5) +
+    orbit(0, 2.6, 0, true) + orbit(60) + orbit(-60) +
     `<circle class="phys-nuc" cx="32" cy="32" r="5.5" fill="url(#sic-nuc)"/>`,
     'sic-phys');
 
