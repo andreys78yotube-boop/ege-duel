@@ -595,6 +595,37 @@ body.on-home .login-btn:not(.hide), body.on-home .login-btn.hide + .streak-btn {
 .pview .pstats { grid-template-columns: repeat(2, 1fr); }
 .pview-show { width: 100%; text-align: left; }
 
+/* ===== алмазы, магазин, цвета карточки, статусы друзей, приглашения ===== */
+.gem-btn { display: inline-flex; align-items: center; gap: 4px; border: 0; background: var(--bg2); border-radius: 999px; padding: 5px 10px 5px 7px; font-weight: 800; font-size: 14px; color: var(--ink2); margin-left: 6px; cursor: default; }
+.gem-btn:disabled { opacity: 1; }
+.shop-fab { position: fixed; left: 18px; bottom: 18px; z-index: 40; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-weight: 800; font-size: 15px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.14); transition: transform .15s, box-shadow .15s, opacity .2s; }
+.shop-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.18); }
+.shop-fab.on { border-color: var(--accent); color: var(--accent); }
+.shop-fab.hide { display: none; }
+.shop-ic { font-size: 56px; }
+@media (max-width: 600px) { .shop-fab { left: 12px; bottom: 12px; padding: 10px 14px; font-size: 14px; } }
+.pcard.tinted { background: color-mix(in srgb, var(--pc) 16%, var(--card)); border: 2px solid var(--pc); border-radius: 14px; padding: 12px; }
+.versus .pcard.tinted { background: color-mix(in srgb, var(--pc) 16%, var(--bg)); border: 2px solid var(--pc); }
+.card-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 8px; max-width: 400px; }
+.card-colors .cc { aspect-ratio: 1; width: 100%; border-radius: 50%; border: 2px solid transparent; background: var(--pc); cursor: pointer; box-shadow: inset 0 0 0 2px var(--card); transition: transform .12s; }
+.card-colors .cc:hover { transform: scale(1.1); }
+.card-colors .cc.none { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--line); position: relative; }
+.card-colors .cc.none::after { content: ''; position: absolute; left: 20%; right: 20%; top: 50%; height: 2px; background: var(--ink3); transform: rotate(-45deg); }
+.card-colors .cc.on { border-color: var(--ink); }
+.pstats .fav-stat { grid-column: 1 / -1; }
+.pstats .fav-stat b { font-size: 18px; }
+.st-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #adb5bd; margin-right: 5px; vertical-align: 1px; }
+.st-dot.on { background: #2fb344; box-shadow: 0 0 0 3px rgba(47,179,68,.18); }
+.fr-st.on { color: #2fb344; font-weight: 700; }
+.pv-st { margin-top: 4px; font-size: 13px; color: var(--ink3); }
+.friend-row .fr-inv { padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+.inv-subj { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.invite-pop { position: fixed; right: 18px; bottom: 18px; z-index: 60; width: min(360px, calc(100vw - 36px)); padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.25); animation: ip-in .35s cubic-bezier(.2,.9,.3,1.2); border: 2px solid var(--accent); }
+.ip-title { font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+.ip-text { font-size: 14px; color: var(--ink2); }
+@keyframes ip-in { from { transform: translateY(20px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+#main { padding-bottom: 84px; }
+
 </style>
 </head>
 <body>
@@ -609,10 +640,12 @@ body.on-home .login-btn:not(.hide), body.on-home .login-btn.hide + .streak-btn {
     </nav>
     <button class="btn soft login-btn hide" id="login-btn">Войти</button>
     <button class="streak-btn" id="streak-btn" aria-label="Огонёк — серия дней"></button>
+    <button class="gem-btn" id="gem-btn" type="button" disabled title="Алмазы — скоро появятся" aria-label="Алмазы: 0"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h12l4 6-10 12L2 9z" fill="#4dabf7"/><path d="M2 9h20L12 21z" fill="#1c7ed6"/><path d="M6 3l3 6h6l3-6M9 9l3 12 3-12" fill="none" stroke="#d0ebff" stroke-width="1.2" stroke-linejoin="round"/></svg><b>0</b></button>
     <button class="me-btn" id="me-btn" title="Мой профиль" aria-label="Мой профиль"></button>
     <button class="theme-btn" id="theme" title="Светлая / тёмная тема" aria-label="Сменить тему">◐</button>
   </div>
 </header>
+<button class="shop-fab" id="shop-btn" type="button" aria-label="Магазин"><span aria-hidden="true">🛒</span> Магазин</button>
 <main><div class="wrap" id="main"></div></main>
 <div class="conn" id="conn">Нет связи — переподключаемся…</div>
 <div class="toast" id="toast"></div>
@@ -5443,6 +5476,11 @@ var Profile = (function () {
   const PHOTO_MAX = 60000; // символов в data URL
   const PRESETS = ['🦊', '🐼', '🐱', '🦉', '🐸', '🐧', '🐯', '🐨', '🚀', '⚡', '🔥', '🌟', '🎯', '🧠', '📐', '🎓'];
   const COLORS = ['#4c6ef5', '#12b886', '#f76707', '#e64980', '#7950f2', '#15aabf', '#fab005', '#fa5252'];
+  // цвета карточки профиля: 0 — стандартная, 1–16 — цветные
+  const CARDS = [null, '#fa5252', '#e64980', '#be4bdb', '#7950f2', '#4c6ef5', '#228be6', '#15aabf', '#12b886', '#40c057', '#82c91e', '#fab005', '#fd7e14', '#a0522d', '#868e96', '#343a40', '#d4a017'];
+  const SUBJ_IDS = ['math', 'rus', 'soc', 'bio', 'phys', 'chem'];
+  const cleanSubj = (o) => { const out = {}; SUBJ_IDS.forEach((k) => { const v = Math.max(0, Math.min(1e6, Math.floor(+(o && o[k]) || 0))); if (v) out[k] = v; }); return out; };
+  const cardIdx = (v) => { v = Math.floor(+v || 0); return v >= 0 && v < CARDS.length ? v : 0; };
   const EMPTY_STATS = { duels: 0, wins: 0, losses: 0, draws: 0, solo: 0, bestSolo: 0, solved: 0 };
 
   const esc = (s) => String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -5459,6 +5497,8 @@ var Profile = (function () {
     p.stats = Object.assign({}, EMPTY_STATS, p.stats || {});
     p.days = Streak.normalize(p.days);
     p.counts = cleanCounts(p.counts);
+    p.card = cardIdx(p.card);
+    p.subj = cleanSubj(p.subj);
     return p;
   }
   // Число заданий по дням: { '2026-11-08': 5, ... }, храним последние 400 дней
@@ -5496,6 +5536,8 @@ var Profile = (function () {
       counts: cleanCounts(me.counts),
       tag: me.tag || null,
       friends: (me.friends || []).filter((x) => typeof x === 'string').slice(0, 200),
+      card: cardIdx(me.card),
+      subj: cleanSubj(me.subj),
     };
   }
   // Публичная карточка (коллекция profiles): то, что видят другие по #
@@ -5503,7 +5545,7 @@ var Profile = (function () {
     const st = me.stats;
     return {
       name: (me.name || '').trim().slice(0, 24) || 'Игрок', bio: String(me.bio || '').slice(0, BIO_MAX), photo: me.photo || null,
-      preset: me.preset | 0, color: me.color | 0, tag: me.tag,
+      preset: me.preset | 0, color: me.color | 0, tag: me.tag, card: cardIdx(me.card),
       stats: { duels: st.duels, wins: st.wins, bestSolo: st.bestSolo, solved: st.solved, streak: Streak.info(me.days).count, bestStreak: Streak.info(me.days).best },
     };
   }
@@ -5537,6 +5579,10 @@ var Profile = (function () {
     Object.keys(lc).forEach((k) => { cc[k] = Math.max(cc[k] || 0, lc[k]); });
     me.counts = cleanCounts(cc);
     if (typeof d.tag === 'string' && /^[A-Z0-9]{6}$/.test(d.tag)) me.tag = d.tag;
+    me.card = cardIdx(d.card);
+    const cs = cleanSubj(d.subj), ls = cleanSubj(me.subj);
+    Object.keys(ls).forEach((k) => { cs[k] = Math.max(cs[k] || 0, ls[k]); });
+    me.subj = cs;
     me.friends = Array.isArray(d.friends) ? d.friends.filter((x) => typeof x === 'string').slice(0, 200) : [];
     saveLocal();
   }
@@ -5567,7 +5613,7 @@ var Profile = (function () {
   }
   // После выхода из аккаунта — чистый профиль на этом устройстве
   function resetLocal() {
-    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [], counts: {}, tag: null, friends: [] };
+    me = { name: '', bio: '', photo: null, preset: Math.floor(Math.random() * PRESETS.length), color: Math.floor(Math.random() * COLORS.length), stats: Object.assign({}, EMPTY_STATS), days: [], counts: {}, tag: null, friends: [], card: 0, subj: {} };
     saveLocal();
   }
 
@@ -5580,6 +5626,7 @@ var Profile = (function () {
       preset: me.preset | 0,
       color: me.color | 0,
       tag: me.tag || null,
+      card: cardIdx(me.card),
       stats: { duels: me.stats.duels, wins: me.stats.wins, bestSolo: me.stats.bestSolo, streak: Streak.info(me.days).count },
     };
   }
@@ -5597,6 +5644,7 @@ var Profile = (function () {
       preset: Math.abs(p.preset | 0) % PRESETS.length,
       color: Math.abs(p.color | 0) % COLORS.length,
       tag: typeof p.tag === 'string' && /^[A-Z0-9]{6}$/.test(p.tag) ? p.tag : null,
+      card: cardIdx(p.card),
       stats: { duels: int(st.duels), wins: int(st.wins), bestSolo: int(st.bestSolo), streak: Math.min(int(st.streak), 5000) },
     };
   }
@@ -5616,11 +5664,12 @@ var Profile = (function () {
 
   const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
 
+  const winRate = (st) => (st && st.duels ? Math.round((Math.min(st.wins, st.duels) / st.duels) * 100) : 0);
   function statLine(st) {
     if (!st) return '';
     const parts = [];
     parts.push(`⚔️ ${st.duels} ${plural(st.duels, 'дуэль', 'дуэли', 'дуэлей')}`);
-    parts.push(`🏆 ${st.wins} ${plural(st.wins, 'победа', 'победы', 'побед')}`);
+    parts.push(`🏆 ${winRate(st)}% побед`);
     if (st.bestSolo) parts.push(`🎯 рекорд соло: ${st.bestSolo}`);
     if (st.streak) parts.push(`🔥 ${st.streak} ${plural(st.streak, 'день', 'дня', 'дней')} подряд`);
     return parts.join(' · ');
@@ -5628,7 +5677,8 @@ var Profile = (function () {
 
   function card(p, label) {
     p = p || fallback('');
-    return `<div class="pcard">
+    const cc = CARDS[cardIdx(p.card)];
+    return `<div class="pcard${cc ? ' tinted' : ''}"${cc ? ` style="--pc:${cc}"` : ''}>
       ${avatar(p, 64)}
       <div class="pcard-body">
         ${label ? `<div class="pcard-lbl">${esc(label)}</div>` : ''}
@@ -5689,8 +5739,9 @@ var Profile = (function () {
   function resetStats() { me.stats = Object.assign({}, EMPTY_STATS); save(); }
 
   // Отметить сегодняшний день в огоньке (вызывается при каждом ответе на задание)
-  function markToday() {
+  function markToday(subj) {
     const t = Streak.today();
+    if (SUBJ_IDS.indexOf(subj) >= 0) { me.subj = cleanSubj(me.subj); me.subj[subj] = (me.subj[subj] || 0) + 1; }
     me.counts = cleanCounts(me.counts);
     me.counts[t] = (me.counts[t] || 0) + 1;
     me.days = Streak.normalize(me.days);
@@ -5700,10 +5751,17 @@ var Profile = (function () {
     return isNew;
   }
   const streak = () => Streak.info(me.days);
+  // любимый предмет — тот, по которому решено больше всего заданий
+  function favorite() {
+    const s = cleanSubj(me.subj);
+    let best = null;
+    Object.keys(s).forEach((k) => { if (!best || s[k] > s[best]) best = k; });
+    return best ? { id: best, count: s[best] } : null;
+  }
 
   return {
-    get me() { return me; }, save, shared, cloudData, publicData, sanitizePublic, applyCloud, fillFromGoogle, resetLocal, markToday, streak, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats,
-    PRESETS, COLORS, BIO_MAX, esc,
+    get me() { return me; }, save, shared, cloudData, publicData, sanitizePublic, applyCloud, fillFromGoogle, resetLocal, markToday, streak, sanitize, fallback, avatar, card, statLine, readPhoto, record, resetStats, favorite, winRate,
+    PRESETS, CARDS, COLORS, BIO_MAX, esc,
   };
 })();
 
@@ -5714,6 +5772,8 @@ var Profile = (function () {
 var Cloud = (function () {
   const CONFIG = window.FIREBASE_CONFIG || null;
   let auth = null, db = null, user = null, ready = false, saveTimer = null, lastError = '';
+  let beatTimer = null, inviteUnsub = null, inviteCb = null;
+  const ONLINE_MS = 150000; // «в сети», если отметка была за последние 2,5 минуты
   const subs = [];
   const emit = () => subs.forEach((f) => { try { f(); } catch (e) {} });
 
@@ -5741,7 +5801,8 @@ var Cloud = (function () {
       user = u;
       if (u) {
         try { await pull(); lastError = ''; } catch (e) { lastError = 'Не удалось загрузить профиль: ' + msg(e); }
-      }
+        startPresence();
+      } else stopPresence();
       ready = true;
       emit();
     });
@@ -5762,6 +5823,8 @@ var Cloud = (function () {
 
   async function signOut() {
     clearTimeout(saveTimer);
+    await goOffline();
+    stopPresence();
     if (user) { try { await push(); } catch (e) {} }
     await auth.signOut();
     Profile.resetLocal();
@@ -5814,6 +5877,7 @@ var Cloud = (function () {
     if (Profile.me.tag) {
       const pub = Profile.publicData();
       pub.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      pub.lastSeen = firebase.firestore.FieldValue.serverTimestamp();
       await db.collection('profiles').doc(user.uid).set(pub);
     }
   }
@@ -5822,7 +5886,10 @@ var Cloud = (function () {
   const normTag = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   async function getProfile(uid) {
     const s = await db.collection('profiles').doc(uid).get();
-    return s.exists ? Object.assign({ uid }, Profile.sanitizePublic(s.data())) : null;
+    if (!s.exists) return null;
+    const d = s.data();
+    const seen = d.lastSeen && d.lastSeen.toMillis ? d.lastSeen.toMillis() : 0;
+    return Object.assign({ uid, online: !!seen && Date.now() - seen < ONLINE_MS }, Profile.sanitizePublic(d));
   }
   async function findByTag(raw) {
     if (!user) throw new Error('Войдите через Google, чтобы искать профили');
@@ -5852,6 +5919,60 @@ var Cloud = (function () {
     await push();
   }
 
+  /* ---- статус «в сети»: отметка lastSeen в публичной карточке раз в минуту ---- */
+  function beat() {
+    if (!user || !Profile.me.tag) return;
+    db.collection('profiles').doc(user.uid).update({ lastSeen: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+  }
+  function goOffline() {
+    if (!user || !Profile.me.tag) return Promise.resolve();
+    return db.collection('profiles').doc(user.uid).update({ lastSeen: firebase.firestore.Timestamp.fromMillis(0) }).catch(() => {});
+  }
+  function startPresence() {
+    stopPresence();
+    beat();
+    beatTimer = setInterval(beat, 60000);
+    listenInvites();
+  }
+  function stopPresence() {
+    clearInterval(beatTimer); beatTimer = null;
+    if (inviteUnsub) { inviteUnsub(); inviteUnsub = null; }
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', () => { goOffline(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') beat(); });
+  }
+
+  /* ---- приглашения в дуэль: документ invites/{кому}_{от кого} ---- */
+  const SUBJ_OK = ['math', 'rus', 'soc', 'bio', 'phys'];
+  async function sendInvite(toUid, code, subject) {
+    if (!user) throw new Error('Войдите через Google');
+    if (SUBJ_OK.indexOf(subject) < 0) throw new Error('Неизвестный предмет');
+    await db.collection('invites').doc(toUid + '_' + user.uid).set({
+      from: user.uid, to: toUid, fromName: (Profile.me.name || 'Игрок').slice(0, 24), fromTag: Profile.me.tag || '',
+      code: String(code).slice(0, 8), subject, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  function cancelInvite(toUid) {
+    if (!user) return Promise.resolve();
+    return db.collection('invites').doc(toUid + '_' + user.uid).delete().catch(() => {});
+  }
+  function dropInvite(id) { return db.collection('invites').doc(id).delete().catch(() => {}); }
+  function listenInvites() {
+    if (!user || inviteUnsub) return;
+    inviteUnsub = db.collection('invites').where('to', '==', user.uid).onSnapshot((snap) => {
+      const list = [];
+      snap.forEach((d) => {
+        const x = d.data();
+        const at = x.createdAt && x.createdAt.toMillis ? x.createdAt.toMillis() : Date.now();
+        if (Date.now() - at > 15 * 60000) { dropInvite(d.id); return; } // старые приглашения убираем
+        if (SUBJ_OK.indexOf(x.subject) < 0 || !/^[0-9A-Z]{4,8}$/.test(String(x.code || ''))) return;
+        list.push({ id: d.id, from: x.from, name: String(x.fromName || 'Игрок').slice(0, 24), tag: String(x.fromTag || ''), code: x.code, subject: x.subject });
+      });
+      if (inviteCb) inviteCb(list);
+    }, () => {});
+  }
+
   function schedulePush() {
     if (!user) return;
     clearTimeout(saveTimer);
@@ -5859,7 +5980,7 @@ var Cloud = (function () {
   }
 
   return {
-    init, signIn, signOut, schedulePush, findByTag, friendsProfiles, addFriend, removeFriend, getProfile, normTag,
+    init, signIn, signOut, schedulePush, sendInvite, cancelInvite, dropInvite, onInvites: (f) => { inviteCb = f; }, findByTag, friendsProfiles, addFriend, removeFriend, getProfile, normTag,
     on: (f) => subs.push(f),
     get available() { return available(); },
     get ready() { return ready; },
@@ -6249,6 +6370,7 @@ var SubjectIcons = (function () {
     bindHost(link);
     sess.set('egeduel:active', { mode: 'host', code: link.code });
     commit();
+    sendPendingInvite(link.code);
   }
 
   function bindHost(link) {
@@ -6391,12 +6513,12 @@ var SubjectIcons = (function () {
       const msg = guestSend('answer', { value: String(value) });
       g.ui.pendingAnswer = { round: g.S.round, msg, at: Date.now(), value: String(value) };
       g.ui.myValue = String(value);
-      if (Profile.markToday()) renderHeaderAvatar();
+      if (Profile.markToday(subjOfState(g.S))) renderHeaderAvatar();
       render();
       return;
     }
     g.ui.myValue = String(value);
-    if (Profile.markToday()) renderHeaderAvatar();
+    if (Profile.markToday(subjOfState(g.S))) renderHeaderAvatar();
     if (submitAnswer(g.S, g.P, 'host', value)) commit();
   }
 
@@ -6426,6 +6548,7 @@ var SubjectIcons = (function () {
       if (q && !confirm(q)) return;
     }
     clearInterval(g.joinTimer); clearTimeout(g.pingTimer);
+    if (app.invitedUid) { Cloud.cancelInvite(app.invitedUid); app.invitedUid = null; }
     if (g.mode === 'host') {
       if (S.phase === 'lobby' || S.phase === 'over') { g.link.clear('state'); g.link.clear('profile/host'); g.link.clear('profile/guest'); }
       else { S.phase = 'over'; if (S.settings.lives) { S.winner = 'guest'; S.reason = 'leave'; } else { S.winner = roundsWinner(S); S.reason = 'stop'; S.stopBy = 'host'; } S.seq++; S.now = Date.now(); g.link.send('state', S, { retain: true }); }
@@ -6556,7 +6679,7 @@ var SubjectIcons = (function () {
     $$('nav.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === app.tab));
     // меню раздела (Дуэль / Соло / Правила) появляется только после выбора предмета
     const navEl = $('nav.tabs');
-    const sectionNav = !(app.tab === 'home' || app.tab === 'soon');
+    const sectionNav = !(app.tab === 'home' || app.tab === 'soon' || app.tab === 'shop');
     if (navEl) navEl.classList.toggle('nav-hidden', !sectionNav);
     document.body.classList.toggle('on-home', !sectionNav);
     const lsm = $('.logo small');
@@ -6566,11 +6689,14 @@ var SubjectIcons = (function () {
     const g = app.game;
     if (g && g.S && g.S.phase === 'over') recordResult(g);
     const gameTab = g ? (g.mode === 'solo' ? 'solo' : 'duel') : null;
+    const shop = $('#shop-btn');
+    if (shop) { shop.classList.toggle('hide', !!(g && app.tab === gameTab && g.S && g.S.phase !== 'over')); shop.classList.toggle('on', app.tab === 'shop'); }
     if (g && app.tab === gameTab) { renderGame(); return; }
     app.rendered = null;
     if (app.tab === 'profile') { if (!$('#profile-page')) renderProfile(); return; }
     if (app.tab === 'home') renderHome();
     else if (app.tab === 'soon') renderSoon();
+    else if (app.tab === 'shop') renderShop();
     else if (app.tab === 'duel') renderDuelHome();
     else if (app.tab === 'solo') renderSoloHome();
     else renderRules();
@@ -6834,6 +6960,8 @@ var SubjectIcons = (function () {
           <section class="card">
             <h3>Так вас видит соперник</h3>
             <div id="p-preview">${Profile.card(Profile.shared())}</div>
+            <div class="lbl" style="margin:14px 0 8px">Цвет карточки</div>
+            <div class="card-colors">${Profile.CARDS.map((c, i) => `<button type="button" class="cc${(Profile.me.card | 0) === i ? ' on' : ''}${c ? '' : ' none'}" data-card="${i}" style="${c ? '--pc:' + c : ''}" title="${c ? 'Цвет ' + i : 'Стандартный'}" aria-label="${c ? 'Цвет ' + i : 'Стандартный цвет'}"></button>`).join('')}</div>
           </section>
           <section class="card">
             <h3>Статистика</h3>
@@ -6846,6 +6974,7 @@ var SubjectIcons = (function () {
               <div class="stat"><b>${st.bestSolo}</b><span>рекорд соло</span></div>
               <div class="stat"><b>${st.solved}</b><span>задач решено</span></div>
               <div class="stat"><b>${st.duels ? Math.round((st.wins / st.duels) * 100) : 0}%</b><span>побед в дуэлях</span></div>
+              ${favTile()}
             </div>
           </section>
         </div>
@@ -6854,6 +6983,11 @@ var SubjectIcons = (function () {
     bindCommon();
     bindAccount();
     bindFriends();
+    $$('[data-card]').forEach((b) => (b.onclick = () => {
+      Profile.me.card = +b.dataset.card; Profile.save();
+      $$('[data-card]').forEach((x) => x.classList.toggle('on', x === b));
+      updateProfilePreview();
+    }));
     const bio = $('#p-bio');
     bio.addEventListener('input', () => {
       Profile.me.bio = bio.value.slice(0, Profile.BIO_MAX);
@@ -6874,6 +7008,65 @@ var SubjectIcons = (function () {
     if ($('#photo-del')) $('#photo-del').onclick = () => { Profile.me.photo = null; Profile.save(); renderProfile(); renderHeaderAvatar(); };
   }
 
+  const SUBJ_NAME = { math: 'Профильная математика', rus: 'Русский язык', soc: 'Обществознание', bio: 'Биология', phys: 'Физика', chem: 'Химия' };
+  const SUBJ_ICON = { math: '📐', rus: '📖', soc: '🏛️', bio: '🧬', phys: '⚛️', chem: '🧪' };
+  function favTile() {
+    const f = Profile.favorite();
+    return `<div class="stat fav-stat"><b>${f ? SUBJ_ICON[f.id] + ' ' + SUBJ_NAME[f.id] : '—'}</b><span>любимый предмет${f ? ' · ' + f.count + ' ' + tasksWord(f.count) : ' — решите пару заданий'}</span></div>`;
+  }
+  const statusHTML = (fp) => `<span class="st-dot ${fp.online ? 'on' : ''}"></span>${fp.online ? 'Онлайн' : 'Оффлайн'}`;
+
+  /* ---------- приглашения в дуэль ---------- */
+  function openInviteModal(fp) {
+    const subs = ['rus', 'math', 'soc', 'bio', 'phys'];
+    let pick = SUBJ[app.subject] ? app.subject : 'math';
+    const m = modal(`<div class="row" style="align-items:center"><h3 style="margin:0">⚔️ Дуэль с ${esc(fp.name)}</h3><span class="sp"></span><button type="button" class="modal-x" data-close aria-label="Закрыть">×</button></div>
+      <p class="muted" style="font-size:14px;margin:8px 0 12px">Выберите предмет. Затем вы настроите комнату (время, жизни, задания), и после её создания ${esc(fp.name)} получит приглашение.</p>
+      <div class="inv-subj">${subs.map((x) => `<button type="button" class="chip${x === pick ? ' on' : ''}" data-isub="${x}">${SUBJ_ICON[x]} ${SUBJ_NAME[x]}</button>`).join('')}</div>
+      <div class="actions" style="justify-content:flex-end"><button type="button" class="btn" id="inv-go">Настроить комнату →</button></div>`);
+    $$('[data-isub]', m.el).forEach((b) => (b.onclick = () => { pick = b.dataset.isub; $$('[data-isub]', m.el).forEach((x) => x.classList.toggle('on', x === b)); }));
+    $('#inv-go', m.el).onclick = () => {
+      if (app.game) { toast('Сначала завершите текущую игру'); return; }
+      app.invite = { uid: fp.uid, name: fp.name, subject: pick };
+      app.subject = pick; app.tab = 'duel'; app.joinError = '';
+      m.close(); render(); animatePage(); window.scrollTo(0, 0);
+    };
+  }
+  function inviteBanner() {
+    const iv = app.invite;
+    if (!iv) return '';
+    if (iv.subject !== app.subject) { app.invite = null; return ''; }
+    return `<div class="notice invite-note" style="margin-bottom:18px">⚔️ Приглашение для <b>${esc(iv.name)}</b>: настройте комнату и нажмите «Создать комнату» — друг сразу получит приглашение. <button type="button" class="link" id="inv-cancel">Отменить</button></div>`;
+  }
+  function sendPendingInvite(code) {
+    const iv = app.invite;
+    if (!iv) return;
+    app.invite = null;
+    app.invitedUid = iv.uid;
+    Cloud.sendInvite(iv.uid, code, iv.subject).then(() => toast('Приглашение отправлено: ' + iv.name)).catch((e) => toast('Не удалось отправить приглашение: ' + (e.message || e)));
+  }
+  let invList = [];
+  const invHidden = {};
+  function showInvites(list) {
+    invList = list || [];
+    let box = $('#invite-pop');
+    const iv = invList.find((x) => !invHidden[x.id + x.code]);
+    if (!iv) { if (box) box.remove(); return; }
+    if (!box) { box = document.createElement('div'); box.id = 'invite-pop'; box.className = 'invite-pop card'; document.body.appendChild(box); }
+    box.innerHTML = `<div class="ip-title">⚔️ Приглашение в дуэль</div>
+      <div class="ip-text"><b>${esc(iv.name)}</b>${iv.tag ? ' <span class="muted">#' + esc(iv.tag) + '</span>' : ''} зовёт вас сразиться · ${SUBJ_ICON[iv.subject]} ${SUBJ_NAME[iv.subject]}</div>
+      <div class="actions" style="margin-top:10px"><button type="button" class="btn" id="ip-yes">Принять</button><button type="button" class="btn ghost" id="ip-no">Отклонить</button></div>`;
+    $('#ip-no').onclick = () => { invHidden[iv.id + iv.code] = 1; Cloud.dropInvite(iv.id); showInvites(invList); };
+    $('#ip-yes').onclick = () => {
+      if (app.game && app.game.S && app.game.S.phase !== 'over') { toast('Сначала завершите текущую игру'); return; }
+      if (app.game) leaveGame(true);
+      invHidden[iv.id + iv.code] = 1; Cloud.dropInvite(iv.id); showInvites(invList);
+      if (!app.name.trim()) setName(Profile.me.name || 'Игрок');
+      app.subject = iv.subject; app.tab = 'duel';
+      joinRoom(iv.code);
+    };
+  }
+
   /* ---------- #, друзья, поиск профилей ---------- */
   function friendsCardHTML() {
     if (!Cloud.available) return '<h3>Друзья</h3><p class="muted" style="margin:0">Друзья доступны только на сайте с подключённым входом через Google.</p>';
@@ -6886,7 +7079,7 @@ var SubjectIcons = (function () {
   }
 
   function friendRow(fp) {
-    return `<button type="button" class="friend-row" data-friend="${esc(fp.uid)}">${Profile.avatar(fp, 40)}<span class="fr-main"><b>${esc(fp.name)}</b><span class="muted">#${esc(fp.tag || '')}${fp.stats && fp.stats.streak ? ' · 🔥 ' + fp.stats.streak : ''}</span></span><span class="fr-go">›</span></button>`;
+    return `<div class="friend-row" role="button" tabindex="0" data-friend="${esc(fp.uid)}">${Profile.avatar(fp, 40)}<span class="fr-main"><b>${esc(fp.name)}</b><span class="muted"><span class="fr-st ${fp.online ? 'on' : ''}">${statusHTML(fp)}</span> · #${esc(fp.tag || '')}${fp.stats && fp.stats.streak ? ' · 🔥 ' + fp.stats.streak : ''}</span></span>${fp.online ? `<button type="button" class="btn soft fr-inv" data-invite="${esc(fp.uid)}">⚔️ Позвать</button>` : ''}<span class="fr-go">›</span></div>`;
   }
 
   async function loadFriends() {
@@ -6899,7 +7092,11 @@ var SubjectIcons = (function () {
       const b2 = $('#friends-list');
       if (!b2) return;
       b2.innerHTML = list.length ? list.map(friendRow).join('') : '<p class="muted" style="margin:0;font-size:14px">Не удалось найти профили друзей.</p>';
-      $$('[data-friend]').forEach((b) => (b.onclick = () => { const fp = (app.friendsCache || []).find((x) => x.uid === b.dataset.friend); if (fp) showProfileModal(fp); }));
+      const byUid = (id) => (app.friendsCache || []).find((x) => x.uid === id);
+      $$('[data-friend]').forEach((b) => { b.onclick = () => { const fp = byUid(b.dataset.friend); if (fp) showProfileModal(fp); }; b.onkeydown = (e) => { if (e.key === 'Enter') b.click(); }; });
+      $$('[data-invite]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); const fp = byUid(b.dataset.invite); if (fp) openInviteModal(fp); }));
+      clearTimeout(app.friendsTimer);
+      app.friendsTimer = setTimeout(() => { if (app.tab === 'profile' && $('#friends-list') && !$('#modal.show')) loadFriends(); }, 60000);
     } catch (e) { box.innerHTML = '<p class="notice bad" style="margin:0">Не удалось загрузить друзей. Проверьте интернет.</p>'; }
   }
 
@@ -6929,10 +7126,11 @@ var SubjectIcons = (function () {
       ${Profile.avatar(fp, 84)}
       <div class="pview-name">${esc(fp.name)}</div>
       ${fp.tag ? `<div class="pcard-tag">#${esc(fp.tag)}</div>` : ''}
+      ${fp.online !== undefined ? `<div class="fr-st pv-st ${fp.online ? 'on' : ''}">${statusHTML(fp)}</div>` : ''}
       ${fp.bio ? `<div class="pcard-bio" style="text-align:center;margin-top:8px">${esc(fp.bio)}</div>` : '<div class="pcard-bio muted" style="text-align:center;margin-top:8px">Без описания</div>'}
       <div class="pstats" style="margin-top:14px;width:100%">
         <div class="stat"><b>${st.duels || 0}</b><span>дуэлей</span></div>
-        <div class="stat"><b>${st.wins || 0}</b><span>побед</span></div>
+        <div class="stat"><b>${Profile.winRate(st)}%</b><span>побед</span></div>
         <div class="stat"><b>${st.solved || 0}</b><span>задач решено</span></div>
         <div class="stat"><b>🔥 ${st.streak || 0}</b><span>дней подряд</span></div>
       </div>
@@ -6944,10 +7142,11 @@ var SubjectIcons = (function () {
     const isMe = Cloud.user && fp.uid === Cloud.user.uid;
     const isFriend = (Profile.me.friends || []).indexOf(fp.uid) >= 0;
     const btn = isMe ? '<div class="notice" style="width:100%;text-align:center">Это ваш профиль</div>'
-      : isFriend ? '<button type="button" class="btn danger" id="fr-remove">Удалить из друзей</button>'
+      : isFriend ? (fp.online ? '<button type="button" class="btn" id="fr-invite">⚔️ Позвать в дуэль</button>' : '') + '<button type="button" class="btn danger" id="fr-remove">Удалить из друзей</button>'
       : '<button type="button" class="btn" id="fr-add">＋ Добавить в друзья</button>';
     const m = modal(`<div class="row" style="justify-content:flex-end"><button type="button" class="modal-x" data-close aria-label="Закрыть">×</button></div>${profileBlock(fp)}<div class="actions" style="justify-content:center">${btn}</div>`);
-    const add = $('#fr-add', m.el), rem = $('#fr-remove', m.el);
+    const add = $('#fr-add', m.el), rem = $('#fr-remove', m.el), inv = $('#fr-invite', m.el);
+    if (inv) inv.onclick = () => { m.close(); openInviteModal(fp); };
     if (add) add.onclick = async () => {
       add.disabled = true;
       try { await Cloud.addFriend(fp.uid); toast(fp.name + ' теперь у вас в друзьях'); m.close(); renderProfile(); }
@@ -7003,6 +7202,7 @@ var SubjectIcons = (function () {
     if (!app.joinCode && params.get('room')) app.joinCode = Net.normCode(params.get('room'));
     const html = `
       ${activeGameBanner('duel')}
+      ${inviteBanner()}
       <div class="home-kicker">${SUBJ[app.subject].name}</div>
       <h1>Дуэль 1 на 1</h1>
       <p class="lead">Создайте комнату, отправьте другу код или ссылку и решайте одни и те же задания ЕГЭ по ${({ bio: 'биологии', soc: 'обществознанию', phys: 'физике', rus: 'русскому языку' })[app.subject] || 'профильной математике'} одновременно. Неверный ответ или истёкшее время — минус жизнь. Побеждает тот, у кого жизни остались.</p>
@@ -7036,6 +7236,7 @@ var SubjectIcons = (function () {
     main().innerHTML = html;
     bindCommon();
     $('#create').onclick = createRoom;
+    if ($('#inv-cancel')) $('#inv-cancel').onclick = () => { app.invite = null; render(); };
     $('#join').onclick = () => joinRoom($('#code').value);
     $('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('#code').value); });
     $('#code').addEventListener('input', (e) => { app.joinCode = e.target.value; });
@@ -7077,9 +7278,9 @@ var SubjectIcons = (function () {
     { id: 'chem', name: 'Химия', icon: '🧪', color: '#12b886', note: 'Реакции, расчёты, органика' },
     { id: 'rus', name: 'Русский язык', icon: '📖', color: '#4c6ef5', note: 'Орфография, пунктуация, сочинение' },
     { id: 'soc', name: 'Общество­знание', icon: '🏛️', color: '#f59f00', note: 'Право, экономика, политика' },
-    { id: 'bio', name: 'Биология', icon: '🧬', color: '#40c057', note: 'Клетка, генетика, эволюция' },
     { id: 'phys', name: 'Физика', icon: '⚛️', color: '#e64980', note: 'Механика, электричество, оптика' },
-    { id: 'math', name: 'Профильная математика', icon: '📐', color: '#7950f2', note: 'Все 19 заданий ЕГЭ · дуэли и соло' },
+    { id: 'bio', name: 'Биология', icon: '🧬', color: '#40c057', note: 'Клетка, генетика, эволюция' },
+    { id: 'math', name: 'Профильная математика', icon: '📐', color: '#7950f2', note: 'Алгебра, геометрия, вероятности' },
   ];
 
   function renderHome() {
@@ -7123,6 +7324,18 @@ var SubjectIcons = (function () {
         <div class="actions" style="justify-content:center"><button type="button" class="btn big" id="soon-back">← На главную</button></div>
       </section>`;
     $('#soon-back').onclick = () => { app.tab = 'home'; render(); animatePage(); window.scrollTo(0, 0); };
+  }
+
+  function renderShop() {
+    main().innerHTML = `
+      <section class="soon card" style="--sc:#7950f2">
+        <div class="soon-ic shop-ic">🛒</div>
+        <div class="home-kicker">Магазин</div>
+        <h1>В разработке</h1>
+        <p class="lead" style="margin:0 auto 18px;max-width:520px">Скоро здесь можно будет тратить алмазы 💎 на оформление профиля и другие приятные вещи.</p>
+        <div class="actions" style="justify-content:center"><button type="button" class="btn big" id="shop-back">← На главную</button></div>
+      </section>`;
+    $('#shop-back').onclick = () => { app.tab = 'home'; render(); animatePage(); window.scrollTo(0, 0); };
   }
 
   function renderRules() {
@@ -7606,6 +7819,8 @@ var SubjectIcons = (function () {
     $('#me-btn').onclick = () => { if (app.tab === 'profile') return; app.tab = 'profile'; render(); animatePage(); window.scrollTo(0, 0); };
     $('#login-btn').onclick = doLogin;
     $('#streak-btn').onclick = openStreak;
+    $('#shop-btn').onclick = () => { if (app.tab === 'shop') return; app.tab = 'shop'; render(); animatePage(); window.scrollTo(0, 0); };
+    Cloud.onInvites(showInvites);
     setInterval(renderHeaderAvatar, 60000); // смена суток
     Cloud.on(onCloudChange);
     Cloud.init();

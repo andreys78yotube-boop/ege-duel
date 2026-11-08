@@ -17,11 +17,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'days', 'counts', 'tag', 'friends', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'days', 'counts', 'tag', 'friends', 'card', 'subj', 'updatedAt'])
         && okCommon(request.resource.data)
         && (!('days' in request.resource.data) || (request.resource.data.days is list && request.resource.data.days.size() <= 400))
         && (!('counts' in request.resource.data) || (request.resource.data.counts is map && request.resource.data.counts.size() <= 400))
         && (!('friends' in request.resource.data) || (request.resource.data.friends is list && request.resource.data.friends.size() <= 200))
+        && (!('card' in request.resource.data) || (request.resource.data.card is int && request.resource.data.card >= 0 && request.resource.data.card <= 16))
+        && (!('subj' in request.resource.data) || (request.resource.data.subj is map && request.resource.data.subj.size() <= 10))
         && (!('tag' in request.resource.data) || request.resource.data.tag == null || ownsTag(request.resource.data.tag, uid));
     }
 
@@ -30,9 +32,26 @@ service cloud.firestore {
       allow read: if signedIn();
       allow delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'tag', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['name', 'bio', 'photo', 'preset', 'color', 'stats', 'tag', 'card', 'lastSeen', 'updatedAt'])
         && okCommon(request.resource.data)
+        && (!('card' in request.resource.data) || (request.resource.data.card is int && request.resource.data.card >= 0 && request.resource.data.card <= 16))
+        && (!('lastSeen' in request.resource.data) || request.resource.data.lastSeen is timestamp)
         && ownsTag(request.resource.data.tag, uid);
+    }
+
+    // Приглашение в дуэль: id = {кому}_{от кого}; читают и удаляют только участники
+    match /invites/{id} {
+      allow read, delete: if signedIn() && (resource.data.to == request.auth.uid || resource.data.from == request.auth.uid);
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['from', 'to', 'fromName', 'fromTag', 'code', 'subject', 'createdAt'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string && request.resource.data.to != request.auth.uid
+        && id == request.resource.data.to + '_' + request.auth.uid
+        && request.resource.data.fromName is string && request.resource.data.fromName.size() <= 24
+        && request.resource.data.fromTag is string && request.resource.data.fromTag.size() <= 6
+        && request.resource.data.code is string && request.resource.data.code.matches('^[0-9A-Z]{4,8}$')
+        && request.resource.data.subject in ['math', 'rus', 'soc', 'bio', 'phys']
+        && request.resource.data.createdAt == request.time;
     }
 
     // # → uid. Создаётся один раз, изменить или удалить нельзя
